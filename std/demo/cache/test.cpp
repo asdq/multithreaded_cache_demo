@@ -34,11 +34,11 @@ using namespace std;
 
 const unsigned n_threads = thread::hardware_concurrency() * 2;
 //	const unsigned n_threads = 1;
-const unsigned n_records = 10000;
+const unsigned n_records = 1000;
 
 // cache parameters
 const int dt = 500;	// database updates, ms
-const int timeout = 250; // try to lock data
+const int timeout = 1000; // try to lock data
 const int size = 10000; // start to erase unused data
 
 static

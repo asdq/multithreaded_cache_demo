@@ -24,15 +24,14 @@ THE SOFTWARE.
 
 #include "db_cache.h"
 #include <algorithm>
-#include <cassert>
 #include <exception>
 
 using namespace std;
 
-handle* db_cache_t::locate(const string &key)
+std::shared_ptr<handle> db_cache_t::locate(const string &key)
 {
 	unique_lock<mutex> lk(c_cache_guard);
-	handle *h = nullptr;
+	std::shared_ptr<handle> h;
 	
 	c_read_lock.wait(lk, [this] {
 		return c_cache_write_req == 0;
@@ -73,7 +72,7 @@ handle* db_cache_t::locate(const string &key)
 	return h;
 }
 
-handle* db_cache_t::merge(const string &key)
+std::shared_ptr<handle> db_cache_t::merge(const string &key)
 {
 	unique_lock<mutex> lk(c_cache_guard);
 	
@@ -82,7 +81,7 @@ handle* db_cache_t::merge(const string &key)
 		return c_cache_reading == 0;
 	});
 	
-	auto h = new handle;
+	std::shared_ptr<handle> h(new handle);
 	h -> touched = ATOMIC_VAR_INIT(true);
 	h -> guard.lock();
 	
@@ -108,12 +107,12 @@ handle* db_cache_t::merge(const string &key)
 	return h;
 }
 
-void db_cache_t::unlock(handle *h)
+void db_cache_t::unlock(std::shared_ptr<handle> &h)
 {
 	h -> guard.unlock();
 }
 
-void db_cache_t::lock(handle *h)
+void db_cache_t::lock(std::shared_ptr<handle> &h)
 {
 //	It seems that try_lock_for is buggy
 //	if ( ! h -> guard.try_lock_for(c_handle_timeout)) {
@@ -176,10 +175,6 @@ void db_cache_t::erase_not_touched()
 	auto i = stable_partition(a, b,
 		[] (const cache_entry &t) {
 			return get<1>(t) -> touched.load();
-	});
-	
-	for_each(i, b, [] (cache_entry &t) {
-			delete get<1>(t);
 	});
 	
 	c_unsorted_sz = i - is_sorted_until(a, i);

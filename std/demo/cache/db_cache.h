@@ -29,6 +29,8 @@ THE SOFTWARE.
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -46,7 +48,7 @@ class db_cache_t
 {
 	typedef std::tuple<
 		std::string,	// key
-		handle*	// data
+		std::shared_ptr<handle>	// data
 	> cache_entry;
 	
 	std::vector<cache_entry> c_cache;
@@ -72,10 +74,10 @@ public:
 		c_cache_maxsize(size)
 	{}
 	
-	handle* locate(const std::string &key);
-	handle* merge(const std::string &key);
-	void unlock(handle *h);
-	void lock(handle *h);
+	std::shared_ptr<handle> locate(const std::string &key);
+	std::shared_ptr<handle> merge(const std::string &key);
+	void unlock(std::shared_ptr<handle> &h);
+	void lock(std::shared_ptr<handle> &h);
 	void erase_not_touched();
 	std::vector<std::tuple<std::string, std::string>> update_db();
 };
@@ -86,13 +88,13 @@ class data_handle
 	friend class db_cache_t;
 	
 	db_cache_t *h_cache;
-	handle *h_data;
+	std::shared_ptr<handle> h_data;
 	
 public:
-	data_handle(db_cache_t *c, handle *d)
+	data_handle(db_cache_t *c, const std::shared_ptr<handle> &d)
 	: h_cache(c), h_data(d) {}
 	
-	data_handle() : h_cache(nullptr), h_data(nullptr) {}
+	data_handle() : h_cache(nullptr), h_data() {}
 	~data_handle() { h_cache -> unlock(h_data); }
 	data_handle(const data_handle&) = delete;
 	
@@ -120,11 +122,11 @@ class db_cache : private db_cache_t
 	std::atomic_bool c_timer_exit;
 	std::thread c_timer;
 	
-	handle* get_handle(const std::string &key)
+	std::shared_ptr<handle> get_handle(const std::string &key)
 	{
 		auto h = locate(key);
 		
-		if (h == nullptr) {
+		if ( ! h) {
 			h = merge(key); // h must be already locked
 			h -> data = c_client -> fetch(key);
 		} else lock(h);
