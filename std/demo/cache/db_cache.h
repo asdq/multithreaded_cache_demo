@@ -66,7 +66,7 @@ class db_cache_t
 public:
 
 	explicit
-	db_cache_t(int timeout, size_t size) :
+	db_cache_t(unsigned timeout, size_t size) :
 		c_unsorted_sz(0),
 		c_cache_reading(0),
 		c_cache_write_req(0),
@@ -139,31 +139,36 @@ public:
 		\brief Instantiate a cache.
 		
 		\param c a database connection.
-		\param dt time interval for db to update, in ms.
+		\param utime time interval for db to update, in ms.
 		\param timeout for data lock.
 		\param size when start to clean the cache.
 	*/
-	db_cache(DbClient *c, int dt, int timeout, size_t size) :
+	db_cache(DbClient *c, unsigned utime, int timeout, size_t size) :
 		db_cache_t(timeout, size),
 		c_client(c)
 	{
 		c_timer_exit = ATOMIC_VAR_INIT(false);
-		c_timer = std::thread([this, dt] {
-			std::chrono::milliseconds ms(dt);
+		c_timer = std::thread([this, utime] {
+			std::chrono::milliseconds ms(utime);
+			auto t0 = std::chrono::system_clock::now();
 			
 			c_client -> thread_init();
 			do {
-				std::this_thread::sleep_for(ms);
+				auto t1 = std::chrono::system_clock::now();
+				auto dt = std::chrono::duration_cast<
+					std::chrono::milliseconds>(t1 - t0);
+					
+				std::this_thread::sleep_for(ms - dt % ms);
 				erase_not_touched();
 				c_client -> store(update_db());
-			} while ( ! c_timer_exit.load());
+			} while ( ! c_timer_exit);
 			c_client -> thread_end();
 		});
 	}
 	
 	~db_cache()
 	{
-		c_timer_exit.store(true);
+		c_timer_exit = true;
 		c_timer.join();
 	}
 	
