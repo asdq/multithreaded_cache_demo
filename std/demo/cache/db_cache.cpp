@@ -24,7 +24,6 @@ THE SOFTWARE.
 
 #include "db_cache.h"
 #include <algorithm>
-#include <exception>
 
 using namespace std;
 
@@ -82,8 +81,8 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	});
 	
 	std::shared_ptr<handle> h(new handle);
-	h -> touched = ATOMIC_VAR_INIT(true);
-	h -> guard.lock();
+	h -> touched.store(true);
+	h -> timeout = c_handle_timeout;
 	
 	// append
 	c_cache.emplace_back(key, h);
@@ -107,29 +106,6 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	return h;
 }
 
-void db_cache_t::unlock(std::shared_ptr<handle> &h)
-{
-	h -> guard.unlock();
-}
-
-void db_cache_t::lock(std::shared_ptr<handle> &h)
-{
-//	It seems that try_lock_for is buggy
-//	if ( ! h -> guard.try_lock_for(c_handle_timeout)) {
-//		throw runtime_error("Timeout: failed to lock the handle.");
-//	}
-	
-// no timer
-//	h -> guard.lock();
-	
-//	workaround
-	auto now = std::chrono::system_clock::now();
-	
-	if ( ! h -> guard.try_lock_until(now + c_handle_timeout)) {
-		throw runtime_error("Timeout: failed to lock the handle.");
-	}
-}
-
 vector<tuple<string, string>> db_cache_t::update_db()
 {
 	unique_lock<mutex> lk(c_cache_guard);
@@ -145,12 +121,12 @@ vector<tuple<string, string>> db_cache_t::update_db()
 	for (auto &t : c_cache) {
 		auto h = get<1>(t);
 		
-		lock(h);
+		h -> lock();
 		if (h -> touched.load()) {
 			list.emplace_back(get<0>(t), h -> data);
 			h -> touched.store(false);
 		}
-		unlock(h);
+		h -> unlock();
 	}
 	
 	lk.lock();
