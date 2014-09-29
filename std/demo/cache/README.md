@@ -62,8 +62,6 @@ implemented for a thread is:
 
     timer -> erase_not_touched -> update_db -> store -> timer
     [] -> get_handle -> locate -> lock -> data_handle -> .. ~data_handle -> unlock
-    [] -> get_handle -> locate -> merge -> fetch -> data_handle -> .. ~data_handle -> unlock
-
-merge creates a new entry which is already locked.
+    [] -> get_handle -> locate -> merge -> lock -> fetch -> data_handle -> .. ~data_handle -> unlock
 
 File test.cpp contains code used for testing.

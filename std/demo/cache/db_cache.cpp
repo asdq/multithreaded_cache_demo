@@ -24,7 +24,6 @@ THE SOFTWARE.
 
 #include "db_cache.h"
 #include <algorithm>
-#include <exception>
 
 using namespace std;
 
@@ -39,9 +38,9 @@ std::shared_ptr<handle> db_cache_t::locate(const string &key)
 	++c_cache_reading;
 	
 	// [a, b) ordered , [b, c) not ordered
-	auto a = begin(c_cache);
-	auto b = end(c_cache) - c_unsorted_sz;
-	auto c = end(c_cache);
+	auto a = c_cache.cbegin();
+	auto b = c_cache.cend() - c_unsorted_sz;
+	auto c = c_cache.cend();
 	
 	lk.unlock();
 	
@@ -60,13 +59,14 @@ std::shared_ptr<handle> db_cache_t::locate(const string &key)
 		);
 	}
 	
+	lk.lock();
+	
 	// found in the cache
 	if (i != c && key == get<0>(*i)) {
 		h = get<1>(*i);
-		h -> touched.store(true);
+		h -> touched = true;
 	}
 	
-	lk.lock();
 	--c_cache_reading;
 	c_write_lock.notify_all();
 	return h;
@@ -82,8 +82,8 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	});
 	
 	std::shared_ptr<handle> h(new handle);
-	h -> touched = ATOMIC_VAR_INIT(true);
-	h -> guard.lock();
+	h -> touched = true;
+	h -> timeout = c_handle_timeout;
 	
 	// append
 	c_cache.emplace_back(key, h);
@@ -93,9 +93,9 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	if (log2(c_cache.size() - c_unsorted_sz) < c_unsorted_sz) {
 		
 		// [a, b) ordered , [b, c) not ordered
-		auto a = begin(c_cache);
-		auto b = end(c_cache) - c_unsorted_sz;
-		auto c = end(c_cache);
+		auto a = c_cache.begin();
+		auto b = c_cache.end() - c_unsorted_sz;
+		auto c = c_cache.end();
 		
 		sort(b, c);
 		inplace_merge(a, b, c);
@@ -107,29 +107,6 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	return h;
 }
 
-void db_cache_t::unlock(std::shared_ptr<handle> &h)
-{
-	h -> guard.unlock();
-}
-
-void db_cache_t::lock(std::shared_ptr<handle> &h)
-{
-//	It seems that try_lock_for is buggy
-//	if ( ! h -> guard.try_lock_for(c_handle_timeout)) {
-//		throw runtime_error("Timeout: failed to lock the handle.");
-//	}
-	
-// no timer
-//	h -> guard.lock();
-	
-//	workaround
-	auto now = std::chrono::system_clock::now();
-	
-	if ( ! h -> guard.try_lock_until(now + c_handle_timeout)) {
-		throw runtime_error("Timeout: failed to lock the handle.");
-	}
-}
-
 vector<tuple<string, string>> db_cache_t::update_db()
 {
 	unique_lock<mutex> lk(c_cache_guard);
@@ -138,22 +115,20 @@ vector<tuple<string, string>> db_cache_t::update_db()
 		return c_cache_write_req == 0;
 	});
 	++c_cache_reading;
-	lk.unlock();
 	
 	vector<tuple<string, string>> list;
 	
 	for (auto &t : c_cache) {
 		auto h = get<1>(t);
 		
-		lock(h);
-		if (h -> touched.load()) {
+		h -> lock();
+		if (h -> touched) {
 			list.emplace_back(get<0>(t), h -> data);
-			h -> touched.store(false);
+			h -> touched = false;
 		}
-		unlock(h);
+		h -> unlock();
 	}
 	
-	lk.lock();
 	--c_cache_reading;
 	c_write_lock.notify_all();
 	return list;
@@ -170,11 +145,11 @@ void db_cache_t::erase_not_touched()
 		return c_cache_reading == 0;
 	});
 	
-	auto a = begin(c_cache);
-	auto b = end(c_cache);
+	auto a = c_cache.begin();
+	auto b = c_cache.end();
 	auto i = stable_partition(a, b,
 		[] (const cache_entry &t) {
-			return get<1>(t) -> touched.load();
+			return get<1>(t) -> touched;
 	});
 	
 	c_unsorted_sz = i - is_sorted_until(a, i);

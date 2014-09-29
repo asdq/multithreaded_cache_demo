@@ -200,7 +200,8 @@ void mysql_client::close_connection()
 	if (i != end(mc_conn_list)) {
 		get<1>(*i) -> close();
 		delete get<1>(*i);
-		mc_conn_list.erase(i);
+		swap(*i, mc_conn_list.back());
+		mc_conn_list.pop_back();
 /*
 		cerr
 			<< "==" << id << "=="

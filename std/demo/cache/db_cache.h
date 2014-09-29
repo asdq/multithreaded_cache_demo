@@ -29,6 +29,7 @@ THE SOFTWARE.
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -40,7 +41,31 @@ struct handle
 {
 	std::string data;
 	std::timed_mutex guard;
-	std::atomic_bool touched;
+	std::chrono::milliseconds timeout;
+	bool touched;
+	
+	void unlock()
+	{
+		guard.unlock();
+	}
+	
+	void lock()
+	{
+	//	It seems that try_lock_for is buggy
+	//	if ( ! guard.try_lock_for(timeout)) {
+	//		throw std::runtime_error("Timeout: failed to lock the handle.");
+	//	}
+		
+	// no timer
+	//	guard.lock();
+		
+	//	workaround
+		auto now = std::chrono::system_clock::now();
+		
+		if ( ! guard.try_lock_until(now + timeout)) {
+			throw std::runtime_error("Timeout: failed to lock the handle.");
+		}
+	}
 };
 
 // implement cache
@@ -87,23 +112,17 @@ class data_handle
 {
 	friend class db_cache_t;
 	
-	db_cache_t *h_cache;
 	std::shared_ptr<handle> h_data;
 	
 public:
-	data_handle(db_cache_t *c, const std::shared_ptr<handle> &d)
-	: h_cache(c), h_data(d) {}
-	
-	data_handle() : h_cache(nullptr), h_data() {}
-	~data_handle() { h_cache -> unlock(h_data); }
+	data_handle() : h_data() {}
+	~data_handle() { h_data -> unlock(); }
 	data_handle(const data_handle&) = delete;
-	
-	data_handle(data_handle&& dh)
-	: h_cache(dh.h_cache), h_data(dh.h_data) {}
+	data_handle(data_handle&& dh) : h_data(dh.h_data) {}
+	data_handle(const std::shared_ptr<handle> &d) : h_data(d) {}
 	
 	data_handle& operator = (data_handle&& dh)
 	{
-		h_cache = dh.h_cache;
 		h_data = dh.h_data;
 		return *this;
 	}
@@ -119,18 +138,20 @@ class db_cache : private db_cache_t
 {
 	DbClient *c_client;
 	
-	std::atomic_bool c_timer_exit;
+	bool c_timer_exit;
 	std::thread c_timer;
+	std::mutex guard;
 	
-	std::shared_ptr<handle> get_handle(const std::string &key)
+	void set_exit(bool flag)
 	{
-		auto h = locate(key);
-		
-		if ( ! h) {
-			h = merge(key); // h must be already locked
-			h -> data = c_client -> fetch(key);
-		} else lock(h);
-		return h;
+		std::lock_guard<std::mutex> lk(guard);
+		c_timer_exit = flag;
+	}
+	
+	bool get_exit()
+	{
+		std::lock_guard<std::mutex> lk(guard);
+		return c_timer_exit;
 	}
 	
 public:
@@ -145,9 +166,9 @@ public:
 	*/
 	db_cache(DbClient *c, unsigned utime, int timeout, size_t size) :
 		db_cache_t(timeout, size),
-		c_client(c)
+		c_client(c),
+		c_timer_exit(false)
 	{
-		c_timer_exit = ATOMIC_VAR_INIT(false);
 		c_timer = std::thread([this, utime] {
 			std::chrono::milliseconds ms(utime);
 			auto t0 = std::chrono::system_clock::now();
@@ -161,21 +182,28 @@ public:
 				std::this_thread::sleep_for(ms - dt % ms);
 				erase_not_touched();
 				c_client -> store(update_db());
-			} while ( ! c_timer_exit);
+			} while ( ! get_exit());
 			c_client -> thread_end();
 		});
 	}
 	
 	~db_cache()
 	{
-		c_timer_exit = true;
+		set_exit(true);
 		c_timer.join();
 	}
 	
 	data_handle operator [] (const std::string &key)
 	{
-		auto h = get_handle(key);
-		return data_handle(this, h);
+		auto h = locate(key);
+		
+		if ( ! h) {
+			h = merge(key);
+			h -> lock();
+			h -> data = c_client -> fetch(key);
+		} else h -> lock();
+		
+		return data_handle(h);
 	}
 };
 
