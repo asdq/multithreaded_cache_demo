@@ -39,7 +39,7 @@ const unsigned n_records = 1000;
 // cache parameters
 const int dt = 500;	// database updates, ms
 const int timeout = 1000; // try to lock data
-const int size = 10000; // start to erase unused data
+const int size = 1000; // start to erase unused data
 
 static
 string random_string(int len)
@@ -137,7 +137,7 @@ int main()
 	chrono::time_point<chrono::system_clock> t0, t1;
 	
 	srand(time(nullptr));
-/*
+
 	list = random_table();
 	cout 
 		<< "testing without cache" << '\n'
@@ -153,7 +153,7 @@ int main()
 		<< "elapsed time: "
 		<< chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
 		<< " milliseconds.\n" << endl;
-*/	
+	
 	list = random_table();
 	cout 
 		<< "testing with cache" << '\n'

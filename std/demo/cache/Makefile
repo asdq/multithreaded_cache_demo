@@ -1,5 +1,5 @@
-CC = clang++
-CXX = clang++
+CC = g++
+CXX = g++
 CFLAGS = -Wall -march=native -O2
 CPPFLAGS = -std=c++11 $(CFLAGS)
 LDFLAGS = $(shell mysql_config --libs) -lmysqlcppconn 

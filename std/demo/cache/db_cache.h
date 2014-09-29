@@ -42,7 +42,7 @@ struct handle
 	std::string data;
 	std::timed_mutex guard;
 	std::chrono::milliseconds timeout;
-	std::atomic_bool touched;
+	bool touched;
 	
 	void unlock()
 	{
@@ -138,8 +138,21 @@ class db_cache : private db_cache_t
 {
 	DbClient *c_client;
 	
-	std::atomic_bool c_timer_exit;
+	bool c_timer_exit;
 	std::thread c_timer;
+	std::mutex guard;
+	
+	void set_exit(bool flag)
+	{
+		std::lock_guard<std::mutex> lk(guard);
+		c_timer_exit = flag;
+	}
+	
+	bool get_exit()
+	{
+		std::lock_guard<std::mutex> lk(guard);
+		return c_timer_exit;
+	}
 	
 public:
 	
@@ -169,14 +182,14 @@ public:
 				std::this_thread::sleep_for(ms - dt % ms);
 				erase_not_touched();
 				c_client -> store(update_db());
-			} while ( ! c_timer_exit.load());
+			} while ( ! get_exit());
 			c_client -> thread_end();
 		});
 	}
 	
 	~db_cache()
 	{
-		c_timer_exit.store(true);
+		set_exit(true);
 		c_timer.join();
 	}
 	
