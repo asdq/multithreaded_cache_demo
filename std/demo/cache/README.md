@@ -35,11 +35,11 @@ the tasks:
  - add new data in the cache: method merge()
  - remove unused data if the cache exceeds the given size:
    method erase_not_touched()
- - take the data for database update: method update_db()
+ - take the data for database update: method copy_cache() with update_db()
 
 these methods are either readers or writers.
 Readers can lookup the container, but cannot insert or delete an entry. They
-can lock and unlock a data entry. Readers are locate() and update_db().
+can lock and unlock a data entry. Readers are locate() and copy_cache().
 Writers can lookup the container and can insert or delete an entry in the
 container. They cannot lock or unlock a data entry. Writers are merge() and
 erase_not_touched().
@@ -61,7 +61,7 @@ performed by the task which made a data request. The sequence of actions
 implemented for a thread is:
 
     timer -> erase_not_touched -> update_db -> store -> timer
-    [] -> get_handle -> locate -> lock -> data_handle -> .. ~data_handle -> unlock
-    [] -> get_handle -> locate -> merge -> lock -> fetch -> data_handle -> .. ~data_handle -> unlock
+    [] -> get_handle -> locate -> data_handle -> .. ~data_handle -> unlock
+    [] -> get_handle -> locate -> merge -> fetch -> data_handle -> .. ~data_handle -> unlock
 
 File test.cpp contains code used for testing.

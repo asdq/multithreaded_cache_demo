@@ -36,27 +36,24 @@ std::shared_ptr<handle> db_cache_t::locate(const string &key)
 		return c_cache_write_req == 0;
 	});
 	++c_cache_reading;
+	lk.unlock();
 	
 	// [a, b) ordered , [b, c) not ordered
 	auto a = c_cache.cbegin();
 	auto b = c_cache.cend() - c_unsorted_sz;
 	auto c = c_cache.cend();
 	
-	lk.unlock();
-	
 	// binary search on [a, b)
 	auto i = lower_bound(a, b, forward_as_tuple(key, nullptr),
 		[] (const cache_entry &a, const cache_entry &b) {
 			return get<0>(a) < get<0>(b);
-		}
-	);
+	});
 	
 	// linear search on [b, c)
 	if (i == b || key != get<0>(*i)) {
 		i = find_if(b, c, [&key] (const cache_entry &x) {
 				return key == get<0>(x);
-			}
-		);
+		});
 	}
 	
 	lk.lock();
@@ -64,6 +61,7 @@ std::shared_ptr<handle> db_cache_t::locate(const string &key)
 	// found in the cache
 	if (i != c && key == get<0>(*i)) {
 		h = get<1>(*i);
+		h -> lock();
 		h -> touched = true;
 	}
 	
@@ -82,6 +80,7 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	});
 	
 	std::shared_ptr<handle> h(new handle);
+	h -> lock();
 	h -> touched = true;
 	h -> timeout = c_handle_timeout;
 	
@@ -107,7 +106,7 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	return h;
 }
 
-vector<tuple<string, string>> db_cache_t::update_db()
+vector<db_cache_t::cache_entry> db_cache_t::copy_cache()
 {
 	unique_lock<mutex> lk(c_cache_guard);
 	
@@ -115,22 +114,31 @@ vector<tuple<string, string>> db_cache_t::update_db()
 		return c_cache_write_req == 0;
 	});
 	++c_cache_reading;
+	lk.unlock();
 	
+	vector<cache_entry> list(c_cache);
+	
+	lk.lock();
+	--c_cache_reading;
+	c_write_lock.notify_all();
+	return list;
+}
+
+vector<tuple<string, string>> db_cache_t::update_db()
+{
 	vector<tuple<string, string>> list;
 	
-	for (auto &t : c_cache) {
-		auto h = get<1>(t);
+	for (auto &t : copy_cache()) {
+		auto &h = get<1>(t);
 		
 		h -> lock();
 		if (h -> touched) {
-			list.emplace_back(get<0>(t), h -> data);
+			list.emplace_back(move(get<0>(t)), h -> data);
 			h -> touched = false;
 		}
 		h -> unlock();
 	}
 	
-	--c_cache_reading;
-	c_write_lock.notify_all();
 	return list;
 }
 

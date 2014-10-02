@@ -88,6 +88,8 @@ class db_cache_t
 	const std::chrono::milliseconds c_handle_timeout;
 	const size_t c_cache_maxsize;
 	
+	std::vector<cache_entry> copy_cache();
+	
 public:
 
 	explicit
@@ -199,10 +201,8 @@ public:
 		
 		if ( ! h) {
 			h = merge(key);
-			h -> lock();
 			h -> data = c_client -> fetch(key);
-		} else h -> lock();
-		
+		}
 		return data_handle(h);
 	}
 };
