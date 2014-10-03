@@ -40,32 +40,15 @@ THE SOFTWARE.
 struct handle
 {
 	std::string data;
-	std::timed_mutex guard;
+	std::timed_mutex data_guard;
+	std::mutex touch_guard;
 	std::chrono::milliseconds timeout;
 	bool touched;
 	
-	void unlock()
-	{
-		guard.unlock();
-	}
-	
-	void lock()
-	{
-	//	It seems that try_lock_for is buggy
-	//	if ( ! guard.try_lock_for(timeout)) {
-	//		throw std::runtime_error("Timeout: failed to lock the handle.");
-	//	}
-		
-	// no timer
-	//	guard.lock();
-		
-	//	workaround
-		auto now = std::chrono::system_clock::now();
-		
-		if ( ! guard.try_lock_until(now + timeout)) {
-			throw std::runtime_error("Timeout: failed to lock the handle.");
-		}
-	}
+	void unlock();
+	void lock();
+	bool get_touched();
+	bool set_touched(bool flag);
 };
 
 // implement cache
@@ -201,8 +184,9 @@ public:
 		
 		if ( ! h) {
 			h = merge(key);
+			h -> lock();
 			h -> data = c_client -> fetch(key);
-		}
+		} else h -> lock();
 		return data_handle(h);
 	}
 };
