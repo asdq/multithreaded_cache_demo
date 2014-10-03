@@ -19,8 +19,8 @@ it mantains an open connection for each thread. Methods thread_init() and
 thread_end() should be called at the beginning and at the end of the work
 with a thread respectively. It uses connector/c++.
 
-Template 'db_cache' implements a SLRU cache. It is a wrapper for a database
-connection and the class 'db_cache_t'.
+Template 'db_cache' is a wrapper for a database connection and the class
+'db_cache_t'.
 The database connection has to implement the following methods:
 
     std::string fetch(const std::string &key);
@@ -32,10 +32,10 @@ The cache is actually implemented in 'db_cache_t' which performs almost all
 the tasks:
 
  - find data in the cache: method locate()
- - add new data in the cache: method merge()
+ - add new data in the cache: method add()
  - remove unused data if the cache exceeds the given size:
    method erase_not_touched()
- - take the data for database update: method copy_cache() with update_db()
+ - take the data for database update: method update_db() with copy_cache()
 
 these methods are either readers or writers.
 Readers can lookup the container, but cannot insert or delete an entry. They
@@ -60,8 +60,8 @@ This thread is the only one that performs these actions, other actions are
 performed by the task which made a data request. The sequence of actions
 implemented for a thread is:
 
-    timer -> erase_not_touched -> update_db -> store -> timer
-    [] -> get_handle -> locate -> data_handle -> .. ~data_handle -> unlock
-    [] -> get_handle -> locate -> merge -> fetch -> data_handle -> .. ~data_handle -> unlock
+    timer -> erase_not_touched -> update_db -> copy_cache -> store -> timer
+    [] -> locate -> lock -> data_handle -> .. ~data_handle -> unlock
+    [] -> locate -> fetch -> add -> lock -> data_handle -> .. ~data_handle -> unlock
 
 File test.cpp contains code used for testing.

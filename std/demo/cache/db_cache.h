@@ -36,6 +36,7 @@ THE SOFTWARE.
 #include <thread>
 #include <tuple>
 #include <vector>
+#include <unordered_map>
 
 struct handle
 {
@@ -54,13 +55,12 @@ struct handle
 // implement cache
 class db_cache_t
 {
-	typedef std::tuple<
-		std::string,	// key
-		std::shared_ptr<handle>	// data
-	> cache_entry;
+	typedef std::unordered_map<
+		std::string,
+		std::shared_ptr<handle>
+	> cache_t;
 	
-	std::vector<cache_entry> c_cache;
-	size_t c_unsorted_sz;
+	cache_t c_cache;
 	
 	std::mutex c_cache_guard;
 	std::condition_variable c_read_lock;
@@ -71,13 +71,12 @@ class db_cache_t
 	const std::chrono::milliseconds c_handle_timeout;
 	const size_t c_cache_maxsize;
 	
-	std::vector<cache_entry> copy_cache();
+	cache_t copy_cache();
 	
 public:
 
 	explicit
 	db_cache_t(unsigned timeout, size_t size) :
-		c_unsorted_sz(0),
 		c_cache_reading(0),
 		c_cache_write_req(0),
 		c_handle_timeout(timeout),
@@ -85,8 +84,7 @@ public:
 	{}
 	
 	std::shared_ptr<handle> locate(const std::string &key);
-	std::shared_ptr<handle> append(const std::string &k, const std::string &d);
-	void merge();
+	std::shared_ptr<handle> add(const std::string &k, const std::string &d);
 	void erase_not_touched();
 	std::vector<std::tuple<std::string, std::string>> update_db();
 };
@@ -179,14 +177,12 @@ public:
 	
 	data_handle operator [] (const std::string &key)
 	{
-		merge();
-		
 		auto h = locate(key);
 		
 		if (h) {
 			h -> lock();
 		} else {
-			h = append(key, c_client -> fetch(key));
+			h = add(key, c_client -> fetch(key));
 		}
 		return data_handle(h);
 	}
