@@ -38,7 +38,7 @@ const unsigned n_records = 1000;
 
 // cache parameters
 const int dt = 500;	// database updates, ms
-const int timeout = 1000; // try to lock data
+const int timeout = 100; // try to lock data
 const int size = 1000; // start to erase unused data
 
 static
@@ -62,6 +62,17 @@ vector<mysql_client::record> random_table()
 	for (unsigned i = 0; i < n_records; ++i) {
 		auto s = random_string(5);
 		list.emplace_back(s, s);
+	}
+	return list;
+}
+
+static
+vector<mysql_client::record> sequential_table()
+{
+	vector<mysql_client::record> list;
+	
+	for (unsigned i = 0; i < n_records; ++i) {
+		list.emplace_back(to_string(i), random_string(64));
 	}
 	return list;
 }
@@ -118,10 +129,10 @@ void test_cached(mysql_client &client,
 			}
 			
 			for (auto &t : list) {
-				string fetched = cclient[get<0>(t)].data();
+				auto h = cclient[get<0>(t)];
 				
-//				print(get<0>(t), get<1>(t), fetched);
-				assert(fetched == get<1>(t));
+//				print(get<0>(t), get<1>(t), h.data());
+				assert(h.data() == get<1>(t));
 			}
 
 			client.thread_end();
@@ -137,7 +148,7 @@ int main()
 	chrono::time_point<chrono::system_clock> t0, t1;
 	
 	srand(time(nullptr));
-
+/*
 	list = random_table();
 	cout 
 		<< "testing without cache" << '\n'
@@ -153,8 +164,8 @@ int main()
 		<< "elapsed time: "
 		<< chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
 		<< " milliseconds.\n" << endl;
-	
-	list = random_table();
+*/	
+	list = sequential_table();
 	cout 
 		<< "testing with cache" << '\n'
 		<< "threads: " << n_threads  << '\n'

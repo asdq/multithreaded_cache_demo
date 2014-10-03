@@ -85,9 +85,8 @@ public:
 	{}
 	
 	std::shared_ptr<handle> locate(const std::string &key);
-	std::shared_ptr<handle> merge(const std::string &key);
-	void unlock(std::shared_ptr<handle> &h);
-	void lock(std::shared_ptr<handle> &h);
+	std::shared_ptr<handle> append(const std::string &k, const std::string &d);
+	void merge();
 	void erase_not_touched();
 	std::vector<std::tuple<std::string, std::string>> update_db();
 };
@@ -180,13 +179,15 @@ public:
 	
 	data_handle operator [] (const std::string &key)
 	{
+		merge();
+		
 		auto h = locate(key);
 		
-		if ( ! h) {
-			h = merge(key);
+		if (h) {
 			h -> lock();
-			h -> data = c_client -> fetch(key);
-		} else h -> lock();
+		} else {
+			h = append(key, c_client -> fetch(key));
+		}
 		return data_handle(h);
 	}
 };

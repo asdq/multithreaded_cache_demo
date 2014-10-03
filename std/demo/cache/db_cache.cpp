@@ -30,13 +30,13 @@ using namespace std;
 std::shared_ptr<handle> db_cache_t::locate(const string &key)
 {
 	unique_lock<mutex> lk(c_cache_guard);
-	std::shared_ptr<handle> h;
-	
 	c_read_lock.wait(lk, [this] {
 		return c_cache_write_req == 0;
 	});
 	++c_cache_reading;
 	lk.unlock();
+	
+	std::shared_ptr<handle> h;
 	
 	// [a, b) ordered , [b, c) not ordered
 	auto a = c_cache.cbegin();
@@ -68,10 +68,9 @@ std::shared_ptr<handle> db_cache_t::locate(const string &key)
 	return h;
 }
 
-std::shared_ptr<handle> db_cache_t::merge(const string &key)
+shared_ptr<handle> db_cache_t::append(const string &k, const string &d)
 {
 	unique_lock<mutex> lk(c_cache_guard);
-	
 	++c_cache_write_req;
 	c_write_lock.wait(lk, [this] {
 		return c_cache_reading == 0;
@@ -79,34 +78,45 @@ std::shared_ptr<handle> db_cache_t::merge(const string &key)
 	
 	std::shared_ptr<handle> h(new handle);
 	h -> timeout = c_handle_timeout;
+	h -> lock();
 	h -> set_touched(true);
+	h -> data = d;
 	
-	// append
-	c_cache.emplace_back(key, h);
+	c_cache.emplace_back(k, h);
 	++c_unsorted_sz;
-	
-	// if unordered side is too long, merge it
-	if (log2(c_cache.size() - c_unsorted_sz) < c_unsorted_sz) {
-		
-		// [a, b) ordered , [b, c) not ordered
-		auto a = c_cache.begin();
-		auto b = c_cache.end() - c_unsorted_sz;
-		auto c = c_cache.end();
-		
-		sort(b, c);
-		inplace_merge(a, b, c);
-		c_unsorted_sz = 0;
-	}
 	
 	--c_cache_write_req;
 	if (c_cache_write_req == 0) c_read_lock.notify_all();
 	return h;
 }
 
-vector<db_cache_t::cache_entry> db_cache_t::copy_cache()
+void db_cache_t::merge()
 {
 	unique_lock<mutex> lk(c_cache_guard);
 	
+	if (log2(c_cache.size() - c_unsorted_sz) >= c_unsorted_sz) return;
+	
+	++c_cache_write_req;
+	c_write_lock.wait(lk, [this] {
+		return c_cache_reading == 0;
+	});
+	
+	// [a, b) ordered , [b, c) not ordered
+	auto a = c_cache.begin();
+	auto b = c_cache.end() - c_unsorted_sz;
+	auto c = c_cache.end();
+	
+	sort(b, c);
+	inplace_merge(a, b, c);
+	c_unsorted_sz = 0;
+	
+	--c_cache_write_req;
+	if (c_cache_write_req == 0) c_read_lock.notify_all();
+}
+
+vector<db_cache_t::cache_entry> db_cache_t::copy_cache()
+{
+	unique_lock<mutex> lk(c_cache_guard);
 	c_read_lock.wait(lk, [this] {
 		return c_cache_write_req == 0;
 	});
