@@ -51,7 +51,7 @@ std::shared_ptr<handle> db_cache_t::locate(const string &key)
 	return h;
 }
 
-shared_ptr<handle> db_cache_t::add(const string &k, const string &d)
+shared_ptr<handle> db_cache_t::add(const string &key)
 {
 	unique_lock<mutex> lk(c_cache_guard);
 	++c_cache_write_req;
@@ -59,13 +59,20 @@ shared_ptr<handle> db_cache_t::add(const string &k, const string &d)
 		return c_cache_reading == 0;
 	});
 	
-	std::shared_ptr<handle> h(new handle);
-	h -> timeout = c_handle_timeout;
-	h -> lock();
-	h -> set_touched(true);
-	h -> data = d;
+	auto i = c_cache.find(key);
+	shared_ptr<handle> h;
 	
-	c_cache[k] = h;
+	if (i == c_cache.end()) {
+		h.reset(new handle);
+		h -> timeout = c_handle_timeout;
+		h -> set_touched(true);
+		h -> data = c_client -> fetch(key);
+		h -> lock();
+		c_cache[key] = h;
+	} else {
+		h = i -> second;
+		h -> set_touched(true);
+	}
 	
 	--c_cache_write_req;
 	if (c_cache_write_req == 0) c_read_lock.notify_all();
@@ -89,7 +96,7 @@ db_cache_t::cache_t db_cache_t::copy_cache()
 	return cache;
 }
 
-vector<tuple<string, string>> db_cache_t::update_db()
+void db_cache_t::update_db()
 {
 	vector<tuple<string, string>> list;
 	
@@ -100,7 +107,7 @@ vector<tuple<string, string>> db_cache_t::update_db()
 		}
 		t.second -> unlock();
 	}
-	return list;
+	c_client -> store(list);
 }
 
 void db_cache_t::erase_not_touched()

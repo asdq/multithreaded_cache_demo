@@ -117,7 +117,7 @@ static
 void test_cached(mysql_client &client,
 	const vector<mysql_client::record> &list)
 {
-	db_cache<mysql_client> cclient(&client, dt, timeout, size);
+	db_cache cclient(&client, dt, timeout, size);
 	vector<thread> vt;
 	
 	for (unsigned i = 0; i < n_threads; ++i) {

@@ -25,7 +25,7 @@ THE SOFTWARE.
 */
 
 #include <iostream>
-
+#include "mysql_client.h"
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -60,6 +60,10 @@ class db_cache_t
 		std::shared_ptr<handle>
 	> cache_t;
 	
+protected:	
+	mysql_client *c_client;
+private:
+	
 	cache_t c_cache;
 	
 	std::mutex c_cache_guard;
@@ -76,7 +80,8 @@ class db_cache_t
 public:
 
 	explicit
-	db_cache_t(unsigned timeout, size_t size) :
+	db_cache_t(mysql_client *c, unsigned timeout, size_t size) :
+		c_client(c),
 		c_cache_reading(0),
 		c_cache_write_req(0),
 		c_handle_timeout(timeout),
@@ -84,9 +89,9 @@ public:
 	{}
 	
 	std::shared_ptr<handle> locate(const std::string &key);
-	std::shared_ptr<handle> add(const std::string &k, const std::string &d);
+	std::shared_ptr<handle> add(const std::string &key);
 	void erase_not_touched();
-	std::vector<std::tuple<std::string, std::string>> update_db();
+	void update_db();
 };
 
 // handle locking
@@ -115,11 +120,8 @@ public:
 	}
 };
 
-template<class DbClient>
 class db_cache : private db_cache_t
 {
-	DbClient *c_client;
-	
 	bool c_timer_exit;
 	std::thread c_timer;
 	std::mutex guard;
@@ -146,9 +148,8 @@ public:
 		\param timeout for data lock.
 		\param size when start to clean the cache.
 	*/
-	db_cache(DbClient *c, unsigned utime, int timeout, size_t size) :
-		db_cache_t(timeout, size),
-		c_client(c),
+	db_cache(mysql_client *c, unsigned utime, int timeout, size_t size) :
+		db_cache_t(c, timeout, size),
 		c_timer_exit(false)
 	{
 		c_timer = std::thread([this, utime] {
@@ -163,7 +164,7 @@ public:
 					
 				std::this_thread::sleep_for(ms - dt % ms);
 				erase_not_touched();
-				c_client -> store(update_db());
+				update_db();
 			} while ( ! get_exit());
 			c_client -> thread_end();
 		});
@@ -182,7 +183,7 @@ public:
 		if (h) {
 			h -> lock();
 		} else {
-			h = add(key, c_client -> fetch(key));
+			h = add(key);
 		}
 		return data_handle(h);
 	}
