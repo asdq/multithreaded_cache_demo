@@ -43,62 +43,46 @@ struct handle
 	std::string data;
 	std::timed_mutex data_guard;
 	std::mutex touch_guard;
-	std::chrono::milliseconds timeout;
 	bool touched;
 	
-	void unlock();
-	void lock();
-	bool get_touched();
-	bool set_touched(bool flag);
-};
-
-// implement cache
-class db_cache_t
-{
-	typedef std::unordered_map<
-		std::string,
-		std::shared_ptr<handle>
-	> cache_t;
+	void unlock()
+	{
+		data_guard.unlock();
+	}
 	
-protected:	
-	mysql_client *c_client;
-private:
+	void lock(const std::chrono::milliseconds &timeout)
+	{
+	//	It seems that try_lock_for is buggy
+	//	if ( ! data_guard.try_lock_for(timeout)) {
+	//		throw std::runtime_error("Timeout: failed to lock the handle.");
+	//	}
+		
+	//	workaround
+		auto now = std::chrono::system_clock::now();
+		
+		if ( ! data_guard.try_lock_until(now + timeout)) {
+			throw std::runtime_error("Timeout: failed to lock the handle.");
+		}
+	}
 	
-	cache_t c_cache;
+	bool get_touched()
+	{
+		std::lock_guard<std::mutex> lk(touch_guard);
+		return touched;
+	}
 	
-	std::mutex c_cache_guard;
-	std::condition_variable c_read_lock;
-	std::condition_variable c_write_lock;
-	int c_cache_reading; // number of readers
-	int c_cache_write_req; // requests for writing
-	
-	const std::chrono::milliseconds c_handle_timeout;
-	const size_t c_cache_maxsize;
-	
-	cache_t copy_cache();
-	
-public:
-
-	explicit
-	db_cache_t(mysql_client *c, unsigned timeout, size_t size) :
-		c_client(c),
-		c_cache_reading(0),
-		c_cache_write_req(0),
-		c_handle_timeout(timeout),
-		c_cache_maxsize(size)
-	{}
-	
-	std::shared_ptr<handle> locate(const std::string &key);
-	std::shared_ptr<handle> add(const std::string &key);
-	void erase_not_touched();
-	void update_db();
+	bool set_touched(bool flag)
+	{
+		std::lock_guard<std::mutex> lk(touch_guard);
+		bool old = touched;
+		touched = flag;
+		return old;
+	}
 };
 
 // handle locking
 class data_handle
 {
-	friend class db_cache_t;
-	
 	std::shared_ptr<handle> h_data;
 	
 public:
@@ -120,8 +104,36 @@ public:
 	}
 };
 
-class db_cache : private db_cache_t
+class db_cache
 {
+	mysql_client *c_client;
+	
+	// cache code
+	
+	typedef std::unordered_map<
+		std::string,
+		std::shared_ptr<handle>
+	> cache_t;
+	
+	cache_t c_cache;
+	const std::chrono::milliseconds c_handle_timeout;
+	const size_t c_cache_maxsize;
+	
+	std::shared_ptr<handle> locate(const std::string &key);
+	std::shared_ptr<handle> add(const std::string &key);
+	void erase_not_touched(size_t size);
+	void update_db();
+	
+	// cache locking
+	
+	std::mutex c_cache_guard;
+	std::condition_variable c_read_lock;
+	std::condition_variable c_write_lock;
+	int c_cache_reading; // number of readers
+	int c_cache_write_req; // requests for writing
+	
+	// timer code
+	
 	bool c_timer_exit;
 	std::thread c_timer;
 	std::mutex guard;
@@ -138,6 +150,8 @@ class db_cache : private db_cache_t
 		return c_timer_exit;
 	}
 	
+	void timer_loop(unsigned utime);
+	
 public:
 	
 	/*!
@@ -149,31 +163,20 @@ public:
 		\param size when start to clean the cache.
 	*/
 	db_cache(mysql_client *c, unsigned utime, int timeout, size_t size) :
-		db_cache_t(c, timeout, size),
-		c_timer_exit(false)
-	{
-		c_timer = std::thread([this, utime] {
-			std::chrono::milliseconds ms(utime);
-			auto t0 = std::chrono::system_clock::now();
-			
-			c_client -> thread_init();
-			do {
-				auto t1 = std::chrono::system_clock::now();
-				auto dt = std::chrono::duration_cast<
-					std::chrono::milliseconds>(t1 - t0);
-					
-				std::this_thread::sleep_for(ms - dt % ms);
-				erase_not_touched();
-				update_db();
-			} while ( ! get_exit());
-			c_client -> thread_end();
-		});
-	}
+		c_client(c), c_handle_timeout(timeout), c_cache_maxsize(size),
+		c_cache_reading(0), c_cache_write_req(0), c_timer_exit(false),
+		c_timer([this, utime] { timer_loop(utime); })
+	{}
 	
 	~db_cache()
 	{
 		set_exit(true);
 		c_timer.join();
+		
+		while( ! c_cache.empty()) {
+			erase_not_touched(0);
+			update_db();
+		}
 	}
 	
 	data_handle operator [] (const std::string &key)
@@ -181,11 +184,11 @@ public:
 		auto h = locate(key);
 		
 		if (h) {
-			h -> lock();
+			h -> lock(c_handle_timeout);
 		} else {
 			h = add(key);
 		}
-		return data_handle(h);
+		return h;
 	}
 };
 

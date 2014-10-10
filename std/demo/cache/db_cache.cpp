@@ -27,7 +27,7 @@ THE SOFTWARE.
 
 using namespace std;
 
-std::shared_ptr<handle> db_cache_t::locate(const string &key)
+std::shared_ptr<handle> db_cache::locate(const string &key)
 {
 	unique_lock<mutex> lk(c_cache_guard);
 	c_read_lock.wait(lk, [this] {
@@ -51,7 +51,7 @@ std::shared_ptr<handle> db_cache_t::locate(const string &key)
 	return h;
 }
 
-shared_ptr<handle> db_cache_t::add(const string &key)
+shared_ptr<handle> db_cache::add(const string &key)
 {
 	unique_lock<mutex> lk(c_cache_guard);
 	++c_cache_write_req;
@@ -64,10 +64,9 @@ shared_ptr<handle> db_cache_t::add(const string &key)
 	
 	if (i == c_cache.end()) {
 		h.reset(new handle);
-		h -> timeout = c_handle_timeout;
 		h -> set_touched(true);
 		h -> data = c_client -> fetch(key);
-		h -> lock();
+		h -> lock(c_handle_timeout);
 		c_cache[key] = h;
 	} else {
 		h = i -> second;
@@ -79,29 +78,28 @@ shared_ptr<handle> db_cache_t::add(const string &key)
 	return h;
 }
 
-db_cache_t::cache_t db_cache_t::copy_cache()
-{
-	unique_lock<mutex> lk(c_cache_guard);
-	c_read_lock.wait(lk, [this] {
-		return c_cache_write_req == 0;
-	});
-	++c_cache_reading;
-	lk.unlock();
-	
-	cache_t cache(c_cache);
-	
-	lk.lock();
-	--c_cache_reading;
-	c_write_lock.notify_all();
-	return cache;
-}
-
-void db_cache_t::update_db()
+void db_cache::update_db()
 {
 	vector<tuple<string, string>> list;
 	
+	auto copy_cache = [this] {
+		unique_lock<mutex> lk(c_cache_guard);
+		c_read_lock.wait(lk, [this] {
+			return c_cache_write_req == 0;
+		});
+		++c_cache_reading;
+		lk.unlock();
+		
+		cache_t cache(c_cache);
+		
+		lk.lock();
+		--c_cache_reading;
+		c_write_lock.notify_all();
+		return cache;
+	};
+	
 	for (auto &t : copy_cache()) {
-		t.second -> lock();
+		t.second -> lock(c_handle_timeout);
 		if (t.second -> set_touched(false)) {
 			list.emplace_back(t.first, t.second -> data);
 		}
@@ -110,11 +108,11 @@ void db_cache_t::update_db()
 	c_client -> store(list);
 }
 
-void db_cache_t::erase_not_touched()
+void db_cache::erase_not_touched(size_t size)
 {
 	unique_lock<mutex> lk(c_cache_guard);
 	
-	if (c_cache.size() < c_cache_maxsize) return;
+	if (c_cache.size() < size) return;
 	
 	++c_cache_write_req;
 	c_write_lock.wait(lk, [this] {
@@ -132,39 +130,20 @@ void db_cache_t::erase_not_touched()
 	if (c_cache_write_req == 0) c_read_lock.notify_all();
 }
 
-void handle::unlock()
+void db_cache::timer_loop(unsigned utime)
 {
-	data_guard.unlock();
-}
-
-void handle::lock()
-{
-//	It seems that try_lock_for is buggy
-//	if ( ! data_guard.try_lock_for(timeout)) {
-//		throw std::runtime_error("Timeout: failed to lock the handle.");
-//	}
+	using namespace std::chrono;
+	milliseconds ms(utime);
+	auto t0 = system_clock::now();
 	
-// no timer
-//	data_guard.lock();
-	
-//	workaround
-	auto now = std::chrono::system_clock::now();
-	
-	if ( ! data_guard.try_lock_until(now + timeout)) {
-		throw std::runtime_error("Timeout: failed to lock the handle.");
-	}
-}
-
-bool handle::get_touched()
-{
-	std::lock_guard<std::mutex> lk(touch_guard);
-	return touched;
-}
-
-bool handle::set_touched(bool flag)
-{
-	std::lock_guard<std::mutex> lk(touch_guard);
-	bool old = touched;
-	touched = flag;
-	return old;
+	c_client -> thread_init();
+	do {
+		auto t1 = system_clock::now();
+		auto dt = duration_cast<milliseconds>(t1 - t0);
+			
+		std::this_thread::sleep_for(ms - dt % ms);
+		erase_not_touched(c_cache_maxsize);
+		update_db();
+	} while ( ! get_exit());
+	c_client -> thread_end();
 }
