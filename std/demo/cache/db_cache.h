@@ -24,9 +24,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include <iostream>
-#include "mysql_client.h"
-#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <exception>
@@ -34,48 +31,50 @@ THE SOFTWARE.
 #include <mutex>
 #include <string>
 #include <thread>
-#include <tuple>
 #include <vector>
 #include <unordered_map>
 
-struct handle
+class handle
 {
+	std::timed_mutex h_data_guard;
+	std::mutex h_touch_guard;
+	bool h_touched;
+	
+public:
+
 	std::string data;
-	std::timed_mutex data_guard;
-	std::mutex touch_guard;
-	bool touched;
 	
 	void unlock()
 	{
-		data_guard.unlock();
+		h_data_guard.unlock();
 	}
 	
 	void lock(const std::chrono::milliseconds &timeout)
 	{
 	//	It seems that try_lock_for is buggy
-	//	if ( ! data_guard.try_lock_for(timeout)) {
+	//	if ( ! h_data_guard.try_lock_for(timeout)) {
 	//		throw std::runtime_error("Timeout: failed to lock the handle.");
 	//	}
 		
 	//	workaround
 		auto now = std::chrono::system_clock::now();
 		
-		if ( ! data_guard.try_lock_until(now + timeout)) {
+		if ( ! h_data_guard.try_lock_until(now + timeout)) {
 			throw std::runtime_error("Timeout: failed to lock the handle.");
 		}
 	}
 	
-	bool get_touched()
+	bool touched()
 	{
-		std::lock_guard<std::mutex> lk(touch_guard);
-		return touched;
+		std::lock_guard<std::mutex> lk(h_touch_guard);
+		return h_touched;
 	}
 	
 	bool set_touched(bool flag)
 	{
-		std::lock_guard<std::mutex> lk(touch_guard);
-		bool old = touched;
-		touched = flag;
+		std::lock_guard<std::mutex> lk(h_touch_guard);
+		bool old = h_touched;
+		h_touched = flag;
 		return old;
 	}
 };
@@ -98,11 +97,13 @@ public:
 		return *this;
 	}
 	
-	std::string& data()
+	std::string& operator * ()
 	{
 		return h_data -> data;
 	}
 };
+
+class mysql_client;
 
 class db_cache
 {

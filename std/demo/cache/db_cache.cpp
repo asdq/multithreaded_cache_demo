@@ -23,7 +23,7 @@ THE SOFTWARE.
 */
 
 #include "db_cache.h"
-#include <algorithm>
+#include "mysql_client.h"
 
 using namespace std;
 
@@ -121,7 +121,7 @@ void db_cache::erase_not_touched(size_t size)
 	
 	auto i = c_cache.begin();
 	while (i != c_cache.end()) {
-		if ( ! i -> second -> get_touched()) {
+		if ( ! i -> second -> touched()) {
 			i = c_cache.erase(i);
 		} else ++i;
 	}

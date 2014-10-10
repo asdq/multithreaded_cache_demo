@@ -25,8 +25,6 @@ THE SOFTWARE.
 #include "db_cache.h"
 #include "mysql_client.h"
 #include <iostream>
-#include <thread>
-#include <chrono>
 #include <cstdlib>
 #include <cassert>
 
@@ -125,14 +123,14 @@ void test_cached(mysql_client &client,
 			client.thread_init();
 			
 			for (auto &t : list) {
-				cclient[get<0>(t)].data() = get<1>(t);
+				*cclient[get<0>(t)] = get<1>(t);
 			}
 			
 			for (auto &t : list) {
 				auto h = cclient[get<0>(t)];
 				
-//				print(get<0>(t), get<1>(t), h.data());
-				assert(h.data() == get<1>(t));
+//				print(get<0>(t), get<1>(t), *h);
+				assert(*h == get<1>(t));
 			}
 
 			client.thread_end();

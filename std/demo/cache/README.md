@@ -19,8 +19,7 @@ it mantains an open connection for each thread. Methods thread_init() and
 thread_end() should be called at the beginning and at the end of the work
 with a thread respectively. It uses connector/c++.
 
-Template 'db_cache' is a wrapper for a database connection and the class
-'db_cache_t'.
+Template 'db_cache' is a wrapper for a database connection.
 The database connection has to implement the following methods:
 
     std::string fetch(const std::string &key);
@@ -28,8 +27,7 @@ The database connection has to implement the following methods:
     void thread_init();
     void thread_end();
 
-The cache is actually implemented in 'db_cache_t' which performs almost all
-the tasks:
+The cache performs almost the following tasks:
 
  - find data in the cache: method locate()
  - add new data in the cache: method add()
@@ -41,17 +39,17 @@ these methods are either readers or writers.
 Readers can lookup the container, but cannot insert or delete an entry. They
 can lock and unlock a data entry. Readers are locate() and copy_cache().
 Writers can lookup the container and can insert or delete an entry in the
-container. They cannot lock or unlock a data entry. Writers are merge() and
-erase_not_touched().
+container. They cannot lock or unlock a data entry. Writers are add(),
+merge() and erase_not_touched().
 Writers have precedence on readers and only one writer at a time can access
 the container.
 The only public method of 'db_cache' is operator [] which returns a moveable-
 only object of type 'data_handle'. It ensures unlocking of the data. The
-data itself is available trought method data(), for example:
+data itself is available trought operator * (), for example:
 
     {
         data_handle dh = cache[key];
-        std::cout << dh.data();
+        std::cout << *dh;
     }
 
 On creation 'db_cache' starts a thread which updates the database
@@ -60,7 +58,7 @@ This thread is the only one that performs these actions, other actions are
 performed by the task which made a data request. The sequence of actions
 implemented for a thread is:
 
-    timer -> erase_not_touched -> update_db -> copy_cache -> store -> timer
+    timer_loop -> erase_not_touched -> copy_cache -> update_db -> store -> timer_loop
     [] -> locate -> lock -> data_handle -> .. ~data_handle -> unlock
     [] -> locate -> fetch -> add -> lock -> data_handle -> .. ~data_handle -> unlock
 
