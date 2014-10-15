@@ -113,7 +113,7 @@ public:
 		\brief Check timer.
 		\return true if running, otherwise false.
 	*/
-	operator bool() { return t_thread.joinable() && run(); }
+	operator bool() { return run(); }
 
 	/*!
 		\brief Wakeup the timer.
