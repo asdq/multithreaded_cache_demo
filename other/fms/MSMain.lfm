@@ -1,0 +1,79 @@
+object TMSMainForm: TTMSMainForm
+  Left = 255
+  Height = 350
+  Top = 228
+  Width = 499
+  HelpType = htKeyword
+  ActiveControl = HeadPanel
+  Caption = 'Magic Square'
+  ClientHeight = 350
+  ClientWidth = 499
+  OnCreate = InitForm
+  LCLVersion = '0.9.28.2'
+  object HeadPanel: TPanel
+    Left = 0
+    Height = 27
+    Top = 0
+    Width = 499
+    Align = alTop
+    AutoSize = True
+    ClientHeight = 27
+    ClientWidth = 499
+    TabOrder = 0
+    OnClick = HeadPanelClick
+    object DimLabel: TLabel
+      Left = 53
+      Height = 25
+      Top = 1
+      Width = 39
+      Align = alLeft
+      Caption = ' Dim: '
+      ParentColor = False
+    end
+    object MessageLabel: TLabel
+      Left = 406
+      Height = 25
+      Top = 1
+      Width = 92
+      Align = alRight
+      Caption = 'MessageLabel'
+      ParentColor = False
+      OnClick = HeadPanelClick
+    end
+    object DimSpinEdit: TSpinEdit
+      Left = 92
+      Height = 25
+      Top = 1
+      Width = 50
+      Align = alLeft
+      MaxValue = 10
+      OnChange = DimSpinChanged
+      TabOrder = 0
+      Value = 3
+    end
+    object RestartButton: TButton
+      Left = 1
+      Height = 25
+      Top = 1
+      Width = 52
+      Align = alLeft
+      AutoSize = True
+      Caption = 'Restart'
+      OnClick = RestartButtonClick
+      TabOrder = 1
+    end
+  end
+  object BasePanel: TPanel
+    Left = 0
+    Height = 323
+    Top = 27
+    Width = 499
+    Align = alClient
+    ChildSizing.EnlargeHorizontal = crsHomogenousChildResize
+    ChildSizing.EnlargeVertical = crsHomogenousChildResize
+    ChildSizing.ShrinkHorizontal = crsHomogenousChildResize
+    ChildSizing.ShrinkVertical = crsHomogenousChildResize
+    ChildSizing.Layout = cclLeftToRightThenTopToBottom
+    TabOrder = 1
+  end
+end
