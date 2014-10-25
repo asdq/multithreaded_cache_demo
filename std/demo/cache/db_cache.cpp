@@ -27,7 +27,7 @@ THE SOFTWARE.
 
 using namespace std;
 
-std::shared_ptr<handle> db_cache::locate(const string &key)
+handle* db_cache::locate(const string &key)
 {
     unique_lock<mutex> lk(c_cache_guard);
     c_read_lock.wait(lk, [this] {
@@ -36,7 +36,7 @@ std::shared_ptr<handle> db_cache::locate(const string &key)
     ++c_cache_reading;
     lk.unlock();
     
-    std::shared_ptr<handle> h;
+    handle* h = nullptr;
     auto i = c_cache.find(key);
     
     // found in the cache
@@ -51,7 +51,7 @@ std::shared_ptr<handle> db_cache::locate(const string &key)
     return h;
 }
 
-shared_ptr<handle> db_cache::add(const string &key)
+handle* db_cache::add(const string &key)
 {
     unique_lock<mutex> lk(c_cache_guard);
     ++c_cache_write_req;
@@ -60,10 +60,10 @@ shared_ptr<handle> db_cache::add(const string &key)
     });
     
     auto i = c_cache.find(key);
-    shared_ptr<handle> h;
+    handle* h = nullptr;
     
     if (i == c_cache.end()) {
-        h.reset(new handle);
+        h = new handle;
         h -> set_touched(true);
         h -> data = c_client -> fetch(key);
         h -> lock(c_handle_timeout);
@@ -122,6 +122,7 @@ void db_cache::erase_not_touched(size_t size)
     auto i = c_cache.begin();
     while (i != c_cache.end()) {
         if ( ! i -> second -> touched()) {
+        	delete get<1>(*i);
             i = c_cache.erase(i);
         } else ++i;
     }

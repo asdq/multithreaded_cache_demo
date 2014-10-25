@@ -27,7 +27,6 @@ THE SOFTWARE.
 #include <chrono>
 #include <condition_variable>
 #include <exception>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -82,14 +81,15 @@ public:
 // handle locking
 class data_handle
 {
-    std::shared_ptr<handle> h_data;
+    handle* h_data;
     
 public:
     data_handle() : h_data() {}
     ~data_handle() { h_data -> unlock(); }
-    data_handle(const data_handle&) = delete;
     data_handle(data_handle&& dh) : h_data(dh.h_data) {}
-    data_handle(const std::shared_ptr<handle> &d) : h_data(d) {}
+    data_handle(handle *d) : h_data(d) {}
+    
+    data_handle(const data_handle&) = delete;
     
     data_handle& operator = (data_handle&& dh)
     {
@@ -113,15 +113,15 @@ class db_cache
     
     typedef std::unordered_map<
         std::string,
-        std::shared_ptr<handle>
+        handle*
     > cache_t;
     
     cache_t c_cache;
     const std::chrono::milliseconds c_handle_timeout;
     const size_t c_cache_maxsize;
     
-    std::shared_ptr<handle> locate(const std::string &key);
-    std::shared_ptr<handle> add(const std::string &key);
+    handle* locate(const std::string &key);
+    handle* add(const std::string &key);
     void erase_not_touched(size_t size);
     void update_db();
     
@@ -173,13 +173,12 @@ public:
     
     data_handle operator [] (const std::string &key)
     {
-        auto h = locate(key);
+        handle *h = locate(key);
         
-        if (h) {
-            h -> lock(c_handle_timeout);
-        } else {
-            h = add(key);
-        }
+        if (h == nullptr) {
+           h = add(key);
+        } else h -> lock(c_handle_timeout);
+        
         return h;
     }
 };
