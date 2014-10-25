@@ -48,34 +48,22 @@ string mysql_client::fetch(const string &key)
     sql::ResultSet *res = nullptr;
     string data;
     
-    try {
-        pstmt = conn -> prepareStatement(R"mysql(
-            SELECT     `data`
-            FROM `records`
-            WHERE `key` = ?
-        )mysql");
-        
-        pstmt -> setString(1, key);
-        res = pstmt -> executeQuery();
-        
-        if (res -> rowsCount() != 0) {
-            res -> next();
-            data = res -> getString(1);
-        }
-        
-    } catch (sql::SQLException &e) {
-        cerr
-            << "# ERR: SQLException in file '" << __FILE__ << "' "
-            << "function '" << __FUNCTION__ << "'\n"
-            << "# ERR: " << e.what()
-            << " (MySQL error code: " << e.getErrorCode()
-            << ", SQLState: " << e.getSQLState() << ")"
-            << endl;
+    pstmt = conn -> prepareStatement(R"mysql(
+        SELECT     `data`
+        FROM `records`
+        WHERE `key` = ?
+    )mysql");
+    
+    pstmt -> setString(1, key);
+    res = pstmt -> executeQuery();
+    
+    if (res -> rowsCount() != 0) {
+        res -> next();
+        data = res -> getString(1);
     }
     
     delete res;
     delete pstmt;
-    
     return data;
 }
 
@@ -84,34 +72,23 @@ void mysql_client::store(const vector<record> &list)
     sql::Connection *conn = get_connection();
     sql::PreparedStatement *pstmt = nullptr;
     
-    try {
-        conn -> setAutoCommit(false);
-        
-        pstmt = conn -> prepareStatement(R"mysql(
-            INSERT INTO `records`
-            SET  `key` = ?, `data` = ?
-            ON DUPLICATE KEY UPDATE `data` = ?
-        )mysql");
-        
-        for (auto &t : list) {
-            pstmt -> setString(1, get<0>(t));
-            pstmt -> setString(2, get<1>(t));
-            pstmt -> setString(3, get<1>(t));
-            pstmt -> executeUpdate();
-        }
-        conn -> commit();
-        
-    } catch (sql::SQLException &e) {
-        cerr
-            << "# ERR: SQLException in file '" << __FILE__ << "' "
-            << "function '" << __FUNCTION__ << "'\n"
-            << "# ERR: " << e.what()
-            << " (MySQL error code: " << e.getErrorCode()
-            << ", SQLState: " << e.getSQLState() << ")"
-            << endl;
-    }
-    conn -> setAutoCommit(true);
+    conn -> setAutoCommit(false);
     
+    pstmt = conn -> prepareStatement(R"mysql(
+        INSERT INTO `records`
+        SET  `key` = ?, `data` = ?
+        ON DUPLICATE KEY UPDATE `data` = ?
+    )mysql");
+    
+    for (auto &t : list) {
+        pstmt -> setString(1, get<0>(t));
+        pstmt -> setString(2, get<1>(t));
+        pstmt -> setString(3, get<1>(t));
+        pstmt -> executeUpdate();
+    }
+    conn -> commit();
+    
+    conn -> setAutoCommit(true);
     delete pstmt;
 }
 
@@ -120,27 +97,16 @@ void mysql_client::store(const string &key, const string &data)
     sql::Connection *conn = get_connection();
     sql::PreparedStatement *pstmt = nullptr;
     
-    try {
-        pstmt = conn -> prepareStatement(R"mysql(
-            INSERT INTO `records`
-            SET  `key` = ?, `data` = ?
-            ON DUPLICATE KEY UPDATE `data` = ?
-        )mysql");
-        
-        pstmt -> setString(1, key);
-        pstmt -> setString(2, data);
-        pstmt -> setString(3, data);
-        pstmt -> executeUpdate();
-        
-    } catch (sql::SQLException &e) {
-        cerr
-            << "# ERR: SQLException in file '" << __FILE__ << "' "
-            << "function '" << __FUNCTION__ << "'\n"
-            << "# ERR: " << e.what()
-            << " (MySQL error code: " << e.getErrorCode()
-            << ", SQLState: " << e.getSQLState() << ")"
-            << endl;
-    }
+    pstmt = conn -> prepareStatement(R"mysql(
+        INSERT INTO `records`
+        SET  `key` = ?, `data` = ?
+        ON DUPLICATE KEY UPDATE `data` = ?
+    )mysql");
+    
+    pstmt -> setString(1, key);
+    pstmt -> setString(2, data);
+    pstmt -> setString(3, data);
+    pstmt -> executeUpdate();
     
     delete pstmt;
 }
@@ -180,12 +146,6 @@ sql::Connection* mysql_client::get_connection()
     {
         get<1>(*i) = mc_driver -> connect(mc_host, mc_user, mc_password);
         get<1>(*i) -> setSchema("test");
-/*
-        cerr
-            << "==" << id << "=="
-            << " mysql connection opened."
-            << endl;
-*/
     }
     
     return get<1>(*i);
@@ -205,11 +165,5 @@ void mysql_client::close_connection()
         delete get<1>(*i);
         swap(*i, mc_conn_list.back());
         mc_conn_list.pop_back();
-/*
-        cerr
-            << "==" << id << "=="
-            << " mysql connection closed."
-            << endl;
-*/
     }
 }
