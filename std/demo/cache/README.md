@@ -19,25 +19,17 @@ it mantains an open connection for each thread. Methods thread_init() and
 thread_end() should be called at the beginning and at the end of the work
 with a thread respectively. It uses connector/c++.
 
-Template 'db_cache' is a wrapper for a database connection.
-The database connection has to implement the following methods:
-
-    std::string fetch(const std::string &key);
-    void store(const std::vector<record> &list);
-    void thread_init();
-    void thread_end();
-
-The cache performs almost the following tasks:
+Class 'db_cache' performs the following tasks:
 
  - find data in the cache: method locate()
  - add new data in the cache: method add()
  - remove unused data if the cache exceeds the given size:
    method erase_not_touched()
- - take the data for database update: method update_db() with copy_cache()
+ - take the data for database update: method update_db()
 
 these methods are either readers or writers.
 Readers can lookup the container, but cannot insert or delete an entry. They
-can lock and unlock a data entry. Readers are locate() and copy_cache().
+can lock and unlock a data entry. Readers are locate() and copy_cache in update_db().
 Writers can lookup the container and can insert or delete an entry in the
 container. They cannot lock or unlock a data entry. Writers are add(),
 merge() and erase_not_touched().
