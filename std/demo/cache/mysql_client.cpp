@@ -35,178 +35,178 @@ THE SOFTWARE.
 
 using namespace std;
 
-mysql_client::mysql_client(const std::string &url, const std::string usr,
-	const std::string &pwd) : mc_host(url), mc_user(usr), mc_password(pwd)
+mysql_client::mysql_client(const string &url, const string usr,
+    const string &pwd) : mc_host(url), mc_user(usr), mc_password(pwd)
 {
-	mc_driver = get_driver_instance();
+    mc_driver = get_driver_instance();
 }
 
 string mysql_client::fetch(const string &key)
 {
-	sql::Connection *conn = get_connection();
-	sql::PreparedStatement *pstmt = nullptr;
-	sql::ResultSet *res = nullptr;
-	string data;
-	
-	try {
-		pstmt = conn -> prepareStatement(R"mysql(
-			SELECT 	`data`
-			FROM `records`
-			WHERE `key` = ?
-		)mysql");
-		
-		pstmt -> setString(1, key);
-		res = pstmt -> executeQuery();
-		
-		if (res -> rowsCount() != 0) {
-			res -> next();
-			data = res -> getString(1);
-		}
-		
-	} catch (sql::SQLException &e) {
-		cerr
-			<< "# ERR: SQLException in file '" << __FILE__ << "' "
-			<< "function '" << __FUNCTION__ << "'\n"
-			<< "# ERR: " << e.what()
-			<< " (MySQL error code: " << e.getErrorCode()
-			<< ", SQLState: " << e.getSQLState() << ")"
-			<< endl;
-	}
-	
-	delete res;
-	delete pstmt;
-	
-	return data;
+    sql::Connection *conn = get_connection();
+    sql::PreparedStatement *pstmt = nullptr;
+    sql::ResultSet *res = nullptr;
+    string data;
+    
+    try {
+        pstmt = conn -> prepareStatement(R"mysql(
+            SELECT     `data`
+            FROM `records`
+            WHERE `key` = ?
+        )mysql");
+        
+        pstmt -> setString(1, key);
+        res = pstmt -> executeQuery();
+        
+        if (res -> rowsCount() != 0) {
+            res -> next();
+            data = res -> getString(1);
+        }
+        
+    } catch (sql::SQLException &e) {
+        cerr
+            << "# ERR: SQLException in file '" << __FILE__ << "' "
+            << "function '" << __FUNCTION__ << "'\n"
+            << "# ERR: " << e.what()
+            << " (MySQL error code: " << e.getErrorCode()
+            << ", SQLState: " << e.getSQLState() << ")"
+            << endl;
+    }
+    
+    delete res;
+    delete pstmt;
+    
+    return data;
 }
 
 void mysql_client::store(const vector<record> &list)
 {
-	sql::Connection *conn = get_connection();
-	sql::PreparedStatement *pstmt = nullptr;
-	
-	try {
-		conn -> setAutoCommit(false);
-		
-		pstmt = conn -> prepareStatement(R"mysql(
-			INSERT INTO `records`
-			SET  `key` = ?, `data` = ?
-			ON DUPLICATE KEY UPDATE `data` = ?
-		)mysql");
-		
-		for (auto &t : list) {
-			pstmt -> setString(1, get<0>(t));
-			pstmt -> setString(2, get<1>(t));
-			pstmt -> setString(3, get<1>(t));
-			pstmt -> executeUpdate();
-		}
-		conn -> commit();
-		
-	} catch (sql::SQLException &e) {
-		cerr
-			<< "# ERR: SQLException in file '" << __FILE__ << "' "
-			<< "function '" << __FUNCTION__ << "'\n"
-			<< "# ERR: " << e.what()
-			<< " (MySQL error code: " << e.getErrorCode()
-			<< ", SQLState: " << e.getSQLState() << ")"
-			<< endl;
-	}
-	conn -> setAutoCommit(true);
-	
-	delete pstmt;
+    sql::Connection *conn = get_connection();
+    sql::PreparedStatement *pstmt = nullptr;
+    
+    try {
+        conn -> setAutoCommit(false);
+        
+        pstmt = conn -> prepareStatement(R"mysql(
+            INSERT INTO `records`
+            SET  `key` = ?, `data` = ?
+            ON DUPLICATE KEY UPDATE `data` = ?
+        )mysql");
+        
+        for (auto &t : list) {
+            pstmt -> setString(1, get<0>(t));
+            pstmt -> setString(2, get<1>(t));
+            pstmt -> setString(3, get<1>(t));
+            pstmt -> executeUpdate();
+        }
+        conn -> commit();
+        
+    } catch (sql::SQLException &e) {
+        cerr
+            << "# ERR: SQLException in file '" << __FILE__ << "' "
+            << "function '" << __FUNCTION__ << "'\n"
+            << "# ERR: " << e.what()
+            << " (MySQL error code: " << e.getErrorCode()
+            << ", SQLState: " << e.getSQLState() << ")"
+            << endl;
+    }
+    conn -> setAutoCommit(true);
+    
+    delete pstmt;
 }
 
 void mysql_client::store(const string &key, const string &data)
 {
-	sql::Connection *conn = get_connection();
-	sql::PreparedStatement *pstmt = nullptr;
-	
-	try {
-		pstmt = conn -> prepareStatement(R"mysql(
-			INSERT INTO `records`
-			SET  `key` = ?, `data` = ?
-			ON DUPLICATE KEY UPDATE `data` = ?
-		)mysql");
-		
-		pstmt -> setString(1, key);
-		pstmt -> setString(2, data);
-		pstmt -> setString(3, data);
-		pstmt -> executeUpdate();
-		
-	} catch (sql::SQLException &e) {
-		cerr
-			<< "# ERR: SQLException in file '" << __FILE__ << "' "
-			<< "function '" << __FUNCTION__ << "'\n"
-			<< "# ERR: " << e.what()
-			<< " (MySQL error code: " << e.getErrorCode()
-			<< ", SQLState: " << e.getSQLState() << ")"
-			<< endl;
-	}
-	
-	delete pstmt;
+    sql::Connection *conn = get_connection();
+    sql::PreparedStatement *pstmt = nullptr;
+    
+    try {
+        pstmt = conn -> prepareStatement(R"mysql(
+            INSERT INTO `records`
+            SET  `key` = ?, `data` = ?
+            ON DUPLICATE KEY UPDATE `data` = ?
+        )mysql");
+        
+        pstmt -> setString(1, key);
+        pstmt -> setString(2, data);
+        pstmt -> setString(3, data);
+        pstmt -> executeUpdate();
+        
+    } catch (sql::SQLException &e) {
+        cerr
+            << "# ERR: SQLException in file '" << __FILE__ << "' "
+            << "function '" << __FUNCTION__ << "'\n"
+            << "# ERR: " << e.what()
+            << " (MySQL error code: " << e.getErrorCode()
+            << ", SQLState: " << e.getSQLState() << ")"
+            << endl;
+    }
+    
+    delete pstmt;
 }
 
 void mysql_client::thread_init()
 {
-	mysql_thread_init();
-	get_connection();
+    mysql_thread_init();
+    get_connection();
 }
 
 void mysql_client::thread_end()
 {
-	close_connection();
-	mysql_thread_end();
+    close_connection();
+    mysql_thread_end();
 }
 
 sql::Connection* mysql_client::get_connection()
 {
-	lock_guard<mutex> lk(mc_guard);
-	auto id = this_thread::get_id();
-	auto i = find_if(begin(mc_conn_list), end(mc_conn_list),
-		[id] (const conn_entry &t) {
-			return id == get<0>(t);
-		}
-	);
-	
-	if (i == end(mc_conn_list)) {
-		mc_conn_list.emplace_back(id, nullptr);
-		i = end(mc_conn_list) - 1;
-	}
-	
-	if (get<1>(*i) == nullptr || get<1>(*i) -> isClosed())
-	{
-		get<1>(*i) = mc_driver -> connect(mc_host, mc_user, mc_password);
-		get<1>(*i) -> setSchema("test");
+    lock_guard<mutex> lk(mc_guard);
+    auto id = this_thread::get_id();
+    auto i = find_if(begin(mc_conn_list), end(mc_conn_list),
+        [id] (const conn_entry &t) {
+            return id == get<0>(t);
+        }
+    );
+    
+    if (i == end(mc_conn_list)) {
+        mc_conn_list.emplace_back(id, nullptr);
+        i = end(mc_conn_list) - 1;
+    }
+    
+    if (get<1>(*i) == nullptr || get<1>(*i) -> isClosed())
+    {
+        get<1>(*i) = mc_driver -> connect(mc_host, mc_user, mc_password);
+        get<1>(*i) -> setSchema("test");
 /*
-		cerr
-			<< "==" << id << "=="
-			<< " mysql connection opened."
-			<< endl;
+        cerr
+            << "==" << id << "=="
+            << " mysql connection opened."
+            << endl;
 */
-	}
-	
-	return get<1>(*i);
+    }
+    
+    return get<1>(*i);
 }
 
 void mysql_client::close_connection()
 {
-	lock_guard<mutex> lk(mc_guard);
-	auto id = this_thread::get_id();
-	auto i = find_if(begin(mc_conn_list), end(mc_conn_list),
-		[id] (const conn_entry &t) {
-			return id == get<0>(t);
-		}
-	);
-	
-	if (i != end(mc_conn_list)) {
-		get<1>(*i) -> close();
-		delete get<1>(*i);
-		swap(*i, mc_conn_list.back());
-		mc_conn_list.pop_back();
+    lock_guard<mutex> lk(mc_guard);
+    auto id = this_thread::get_id();
+    auto i = find_if(begin(mc_conn_list), end(mc_conn_list),
+        [id] (const conn_entry &t) {
+            return id == get<0>(t);
+        }
+    );
+    
+    if (i != end(mc_conn_list)) {
+        get<1>(*i) -> close();
+        delete get<1>(*i);
+        swap(*i, mc_conn_list.back());
+        mc_conn_list.pop_back();
 /*
-		cerr
-			<< "==" << id << "=="
-			<< " mysql connection closed."
-			<< endl;
+        cerr
+            << "==" << id << "=="
+            << " mysql connection closed."
+            << endl;
 */
-	}
+    }
 }

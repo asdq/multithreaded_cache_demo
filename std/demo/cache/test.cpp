@@ -31,154 +31,154 @@ THE SOFTWARE.
 using namespace std;
 
 const unsigned n_threads = thread::hardware_concurrency() * 2;
-//	const unsigned n_threads = 1;
+//    const unsigned n_threads = 1;
 const unsigned n_records = 1000;
 
 // cache parameters
-const int dt = 500;	// database updates, ms
+const int dt = 500;    // database updates, ms
 const int timeout = 100; // try to lock data
 const int size = 1000; // start to erase unused data
 
 static
 string random_string(int len)
 {
-	string mask = "a bc def ghij klmno pqrstu vxyz";
-	int mask_len = mask.length();
-	string s;
-	
-	for (int i = 0; i < len; ++i) {
-		s.push_back(mask[rand() % mask_len]);
-	}
-	return s;
+    string mask = "a bc def ghij klmno pqrstu vxyz";
+    int mask_len = mask.length();
+    string s;
+    
+    for (int i = 0; i < len; ++i) {
+        s.push_back(mask[rand() % mask_len]);
+    }
+    return s;
 }
 
 static
 vector<mysql_client::record> random_table()
 {
-	vector<mysql_client::record> list;
-	
-	for (unsigned i = 0; i < n_records; ++i) {
-		auto s = random_string(5);
-		list.emplace_back(s, s);
-	}
-	return list;
+    vector<mysql_client::record> list;
+    
+    for (unsigned i = 0; i < n_records; ++i) {
+        auto s = random_string(5);
+        list.emplace_back(s, s);
+    }
+    return list;
 }
 
 static
 vector<mysql_client::record> sequential_table()
 {
-	vector<mysql_client::record> list;
-	
-	for (unsigned i = 0; i < n_records; ++i) {
-		list.emplace_back(to_string(i), random_string(64));
-	}
-	return list;
+    vector<mysql_client::record> list;
+    
+    for (unsigned i = 0; i < n_records; ++i) {
+        list.emplace_back(to_string(i), random_string(64));
+    }
+    return list;
 }
 
 static
 void print(const string &key, const string &data, const string &fetched)
 {
-	static mutex print_guard;
-	lock_guard<mutex> lk(print_guard);
-	cerr
-		<< "[" << this_thread::get_id() << "] "
-		<< "key: " << key << " "
-		<< "data: " << data << " "
-		<< "fetched: " << fetched
-		<< endl;
+    static mutex print_guard;
+    lock_guard<mutex> lk(print_guard);
+    cerr
+        << "[" << this_thread::get_id() << "] "
+        << "key: " << key << " "
+        << "data: " << data << " "
+        << "fetched: " << fetched
+        << endl;
 }
 
 static
 void test_direct(mysql_client &client,
-	const vector<mysql_client::record> &list)
+    const vector<mysql_client::record> &list)
 {
-	vector<thread> vt;
-	
-	client.store(list);
-	for (unsigned i = 0; i < n_threads; ++i) {
-		vt.emplace_back([&client, &list] {
-			client.thread_init();
-				
-			for (auto &t : list) {
-				auto fetched = client.fetch(get<0>(t));
-				
-//				print(get<0>(t), get<1>(t), fetched);
-				assert(fetched == get<1>(t));
-			}
-			client.thread_end();
-		});
-	}
-	for (auto &t : vt) t.join();
+    vector<thread> vt;
+    
+    client.store(list);
+    for (unsigned i = 0; i < n_threads; ++i) {
+        vt.emplace_back([&client, &list] {
+            client.thread_init();
+                
+            for (auto &t : list) {
+                auto fetched = client.fetch(get<0>(t));
+                
+//                print(get<0>(t), get<1>(t), fetched);
+                assert(fetched == get<1>(t));
+            }
+            client.thread_end();
+        });
+    }
+    for (auto &t : vt) t.join();
 }
 
 static
 void test_cached(mysql_client &client,
-	const vector<mysql_client::record> &list)
+    const vector<mysql_client::record> &list)
 {
-	db_cache cclient(&client, dt, timeout, size);
-	vector<thread> vt;
-	
-	for (unsigned i = 0; i < n_threads; ++i) {
-		vt.emplace_back( [&client, &cclient, &list] {
-			client.thread_init();
-			
-			for (auto &t : list) {
-				*cclient[get<0>(t)] = get<1>(t);
-			}
-			
-			for (auto &t : list) {
-				auto h = cclient[get<0>(t)];
-				
-//				print(get<0>(t), get<1>(t), *h);
-				assert(*h == get<1>(t));
-			}
+    db_cache cclient(&client, dt, timeout, size);
+    vector<thread> vt;
+    
+    for (unsigned i = 0; i < n_threads; ++i) {
+        vt.emplace_back( [&client, &cclient, &list] {
+            client.thread_init();
+            
+            for (auto &t : list) {
+                *cclient[get<0>(t)] = get<1>(t);
+            }
+            
+            for (auto &t : list) {
+                auto h = cclient[get<0>(t)];
+                
+//                print(get<0>(t), get<1>(t), *h);
+                assert(*h == get<1>(t));
+            }
 
-			client.thread_end();
-		});
-	}
-	for (auto &t : vt) t.join();
+            client.thread_end();
+        });
+    }
+    for (auto &t : vt) t.join();
 }
 
 int main()
 {
-	mysql_client client("localhost", "fabio", "");
-	vector<mysql_client::record> list;
-	chrono::time_point<chrono::system_clock> t0, t1;
-	
-	srand(time(nullptr));
+    mysql_client client("localhost", "fabio", "");
+    vector<mysql_client::record> list;
+    chrono::time_point<chrono::system_clock> t0, t1;
+    
+    srand(time(nullptr));
 /*
-	list = random_table();
-	cout 
-		<< "testing without cache" << '\n'
-		<< "threads: " << n_threads  << '\n'
-		<< "records: " << n_records << '\n'
-		<< "..." << endl;
-		
-	t0 = chrono::system_clock::now();
-	test_direct(client, list);
-	t1 = chrono::system_clock::now();
-	
-	cout
-		<< "elapsed time: "
-		<< chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
-		<< " milliseconds.\n" << endl;
-*/	
-	list = sequential_table();
-	cout 
-		<< "testing with cache" << '\n'
-		<< "threads: " << n_threads  << '\n'
-		<< "records: " << n_records << '\n'
-		<< "..." << endl;
-		
-	t0 = chrono::system_clock::now();
-	test_cached(client, list);
-	t1 = chrono::system_clock::now();
-	
-	cout
-		<< "elapsed time: "
-		<< chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
-		<< " milliseconds.\n" << endl;
-	
-	return 0;
+    list = random_table();
+    cout 
+        << "testing without cache" << '\n'
+        << "threads: " << n_threads  << '\n'
+        << "records: " << n_records << '\n'
+        << "..." << endl;
+        
+    t0 = chrono::system_clock::now();
+    test_direct(client, list);
+    t1 = chrono::system_clock::now();
+    
+    cout
+        << "elapsed time: "
+        << chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
+        << " milliseconds.\n" << endl;
+*/    
+    list = sequential_table();
+    cout 
+        << "testing with cache" << '\n'
+        << "threads: " << n_threads  << '\n'
+        << "records: " << n_records << '\n'
+        << "..." << endl;
+        
+    t0 = chrono::system_clock::now();
+    test_cached(client, list);
+    t1 = chrono::system_clock::now();
+    
+    cout
+        << "elapsed time: "
+        << chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
+        << " milliseconds.\n" << endl;
+    
+    return 0;
 }
 

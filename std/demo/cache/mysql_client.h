@@ -31,56 +31,56 @@ THE SOFTWARE.
 #include <vector>
 
 namespace sql {
-	class Driver;
-	class Connection;
+    class Driver;
+    class Connection;
 }
 
 /*!
-	\brief Fetch from, and store to, table 'records' in 'temp' schema.
-	
-	Table format is:
-	
-	    CREATE TABLE `records` (
-	      `key` varchar(20) NOT NULL,
-	      `data` text,
-	     PRIMARY KEY (`key`)
-	    ) ENGINE=InnoDB DEFAULT CHARSET=utf8
-	
-	Keeps a connection opened for each thread.
-	If 'key' is not in 'records', insert a new entry with empty 'data'.
-	
-	\author Fabio Vaccari fabio.vaccari@gmail.com
+    \brief Fetch from, and store to, table 'records' in 'temp' schema.
+    
+    Table format is:
+    
+        CREATE TABLE `records` (
+          `key` varchar(20) NOT NULL,
+          `data` text,
+         PRIMARY KEY (`key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+    
+    Keeps a connection opened for each thread.
+    If 'key' is not in 'records', insert a new entry with empty 'data'.
+    
+    \author Fabio Vaccari fabio.vaccari@gmail.com
 */
 class mysql_client
 {
-	sql::Driver *mc_driver;
-	
-	std::string mc_host;
-	std::string mc_user;
-	std::string mc_password;
-	
-	std::mutex mc_guard;
-	
-	typedef std::tuple<std::thread::id, sql::Connection*> conn_entry;
-	std::vector<conn_entry> mc_conn_list;
-	
-	sql::Connection* get_connection();
-	void close_connection();
-	
+    sql::Driver *mc_driver;
+    
+    std::string mc_host;
+    std::string mc_user;
+    std::string mc_password;
+    
+    std::mutex mc_guard;
+    
+    typedef std::tuple<std::thread::id, sql::Connection*> conn_entry;
+    std::vector<conn_entry> mc_conn_list;
+    
+    sql::Connection* get_connection();
+    void close_connection();
+    
 public:
-	
-	// key, data
-	typedef std::tuple<std::string, std::string> record;
+    
+    // key, data
+    typedef std::tuple<std::string, std::string> record;
 
-	mysql_client() : mc_driver(nullptr) {}
-	mysql_client(const std::string &url, const std::string usr,
-		const std::string &pwd);
+    mysql_client() : mc_driver(nullptr) {}
+    mysql_client(const std::string &url, const std::string usr,
+        const std::string &pwd);
 
-	std::string fetch(const std::string &key);
-	void store(const std::string &key, const std::string &data);
-	void store(const std::vector<record> &list);
-	void thread_init();
-	void thread_end();
+    std::string fetch(const std::string &key);
+    void store(const std::string &key, const std::string &data);
+    void store(const std::vector<record> &list);
+    void thread_init();
+    void thread_end();
 };
 
 #endif

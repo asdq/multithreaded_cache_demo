@@ -31,32 +31,32 @@ THE SOFTWARE.
 namespace futil {
 
 /*!
-	\brief The classic semaphore.
+    \brief The classic semaphore.
 */
 class semaphore
 {
-	std::condition_variable cv;
-	std::mutex guard;
-	int count;
-	
+    std::condition_variable cv;
+    std::mutex guard;
+    int count;
+    
 public:
-	semaphore() : count(0) {}
-	semaphore(int i) : count(i) {}
-	semaphore(const semaphore&) = delete;
-	
-	void wait()
-	{
-		std::unique_lock<std::mutex> lk(guard);
-		cv.wait(lk, [this] { return count > 0; });
-		--count;
-	}
-	
-	void signal()
-	{
-		std::lock_guard<std::mutex> lk(guard);
-		++count;
-		cv.notify_one();
-	}
+    semaphore() : count(0) {}
+    semaphore(int i) : count(i) {}
+    semaphore(const semaphore&) = delete;
+    
+    void wait()
+    {
+        std::unique_lock<std::mutex> lk(guard);
+        cv.wait(lk, [this] { return count > 0; });
+        --count;
+    }
+    
+    void signal()
+    {
+        std::lock_guard<std::mutex> lk(guard);
+        ++count;
+        cv.notify_one();
+    }
 };
 
 } // end futil
