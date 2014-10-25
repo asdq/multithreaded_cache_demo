@@ -36,94 +36,94 @@ THE SOFTWARE.
 namespace futil {
 
 /*!
-	\brief A timer.
-	
-	Run code periodically in a separate thread.
-	Start from specific time point,
-	then wake up the thread at specific intervals.
+    \brief A timer.
+    
+    Run code periodically in a separate thread.
+    Start from specific time point,
+    then wake up the thread at specific intervals.
 */
 class timer
 {
-	std::thread t_thread;
-	std::mutex t_guard;
-	bool t_exit;
-	bool t_run;
-	
-	bool exit()
-	{
-		std::lock_guard<std::mutex> lk(t_guard);
-		return t_exit;
-	}
-	
-	void set_exit(bool flag)
-	{
-		std::lock_guard<std::mutex> lk(t_guard);
-		t_exit = flag;
-	}
-	
-	bool run()
-	{
-		std::lock_guard<std::mutex> lk(t_guard);
-		return t_run;
-	}
-	
-	void set_run(bool flag)
-	{
-		std::lock_guard<std::mutex> lk(t_guard);
-		t_run = flag;
-	}
-	
+    std::thread t_thread;
+    std::mutex t_guard;
+    bool t_exit;
+    bool t_run;
+    
+    bool exit()
+    {
+        std::lock_guard<std::mutex> lk(t_guard);
+        return t_exit;
+    }
+    
+    void set_exit(bool flag)
+    {
+        std::lock_guard<std::mutex> lk(t_guard);
+        t_exit = flag;
+    }
+    
+    bool run()
+    {
+        std::lock_guard<std::mutex> lk(t_guard);
+        return t_run;
+    }
+    
+    void set_run(bool flag)
+    {
+        std::lock_guard<std::mutex> lk(t_guard);
+        t_run = flag;
+    }
+    
 public:
-	
-	/*!
-		\brief Instantiate a timer.
-		\param t0 starting time
-		\param delay time delay.
-		\param f what to call.
-		\param args list of arguments.
-		
-		Start from time point, then repeat until stop.
-	*/
-	template <class TimePoint, class Duration, class Callable, class... Args>
-	timer(TimePoint t0, Duration delay, Callable&& f, Args... args) :
-		t_exit(false), t_run(true)
-	{
-		std::function<typename std::result_of<Callable(Args...)>::type ()>
-			task(std::bind(std::forward<Callable>(f), std::forward<Args>(args)...));
-			
-		t_thread = std::thread([this, t0, delay, task] {
-			std::this_thread::sleep_until(t0);
-			while ( ! exit()) {
-				if (run()) task();
-				
-				auto t1 = std::chrono::system_clock::now();
-				auto dt = std::chrono::duration_cast<Duration>(t1 - t0);
-				std::this_thread::sleep_for(delay - dt % delay);
-			}
-		});
-	}
-	
-	~timer()
-	{
-		set_exit(true);
-		if (t_thread.joinable()) t_thread.join();
-	}
-	
-	/*!
-		\brief Check timer.
-		\return true if running, otherwise false.
-	*/
-	operator bool() { return run(); }
+    
+    /*!
+        \brief Instantiate a timer.
+        \param t0 starting time
+        \param delay time delay.
+        \param f what to call.
+        \param args list of arguments.
+        
+        Start from time point, then repeat until stop.
+    */
+    template <class TimePoint, class Duration, class Callable, class... Args>
+    timer(TimePoint t0, Duration delay, Callable&& f, Args... args) :
+        t_exit(false), t_run(true)
+    {
+        std::function<typename std::result_of<Callable(Args...)>::type ()>
+            task(std::bind(std::forward<Callable>(f), std::forward<Args>(args)...));
+            
+        t_thread = std::thread([this, t0, delay, task] {
+            std::this_thread::sleep_until(t0);
+            while ( ! exit()) {
+                if (run()) task();
+                
+                auto t1 = std::chrono::system_clock::now();
+                auto dt = std::chrono::duration_cast<Duration>(t1 - t0);
+                std::this_thread::sleep_for(delay - dt % delay);
+            }
+        });
+    }
+    
+    ~timer()
+    {
+        set_exit(true);
+        if (t_thread.joinable()) t_thread.join();
+    }
+    
+    /*!
+        \brief Check timer.
+        \return true if running, otherwise false.
+    */
+    operator bool() { return run(); }
 
-	/*!
-		\brief Wakeup the timer.
-	*/
-	void start() { set_run(true); }
-	
-	/*!
-		\brief Pause the timer.
-	*/
-	void stop() { set_run(false); }
+    /*!
+        \brief Wakeup the timer.
+    */
+    void start() { set_run(true); }
+    
+    /*!
+        \brief Pause the timer.
+    */
+    void stop() { set_run(false); }
 };
 
 } // end futil
