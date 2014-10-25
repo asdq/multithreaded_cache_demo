@@ -147,32 +147,36 @@ void mysql_client::store(const string &key, const string &data)
 
 void mysql_client::thread_init()
 {
-    mysql_thread_init();
+    ::mysql_thread_init();
     get_connection();
 }
 
 void mysql_client::thread_end()
 {
     close_connection();
-    mysql_thread_end();
+    ::mysql_thread_end();
 }
 
 sql::Connection* mysql_client::get_connection()
 {
     lock_guard<mutex> lk(mc_guard);
     auto id = this_thread::get_id();
-    auto i = find_if(begin(mc_conn_list), end(mc_conn_list),
+    auto i = find_if(mc_conn_list.begin(), mc_conn_list.end(),
         [id] (const conn_entry &t) {
             return id == get<0>(t);
         }
     );
     
-    if (i == end(mc_conn_list)) {
+    if (i == mc_conn_list.end()) {
         mc_conn_list.emplace_back(id, nullptr);
-        i = end(mc_conn_list) - 1;
+        i = --mc_conn_list.end();
     }
     
-    if (get<1>(*i) == nullptr || get<1>(*i) -> isClosed())
+    if (get<1>(*i) != nullptr && get<1>(*i) -> isClosed()) {
+    	delete get<1>(*i);
+    }
+    	
+    if (get<1>(*i) == nullptr)
     {
         get<1>(*i) = mc_driver -> connect(mc_host, mc_user, mc_password);
         get<1>(*i) -> setSchema("test");
@@ -191,14 +195,13 @@ void mysql_client::close_connection()
 {
     lock_guard<mutex> lk(mc_guard);
     auto id = this_thread::get_id();
-    auto i = find_if(begin(mc_conn_list), end(mc_conn_list),
+    auto i = find_if(mc_conn_list.begin(), mc_conn_list.end(),
         [id] (const conn_entry &t) {
             return id == get<0>(t);
         }
     );
     
-    if (i != end(mc_conn_list)) {
-        get<1>(*i) -> close();
+    if (i != mc_conn_list.end()) {
         delete get<1>(*i);
         swap(*i, mc_conn_list.back());
         mc_conn_list.pop_back();

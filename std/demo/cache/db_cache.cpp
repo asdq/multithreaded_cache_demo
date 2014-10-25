@@ -147,3 +147,16 @@ void db_cache::timer_loop(unsigned utime)
     } while ( ! get_exit());
     c_client -> thread_end();
 }
+    
+db_cache::~db_cache()
+{
+    set_exit(true);
+    c_timer.join();
+    
+    c_client -> thread_init();
+    while( ! c_cache.empty()) {
+        erase_not_touched(0);
+        update_db();
+    }
+    c_client -> thread_end();
+}

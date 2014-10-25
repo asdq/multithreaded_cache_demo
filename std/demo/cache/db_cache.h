@@ -169,16 +169,7 @@ public:
         c_timer([this, utime] { timer_loop(utime); })
     {}
     
-    ~db_cache()
-    {
-        set_exit(true);
-        c_timer.join();
-        
-        while( ! c_cache.empty()) {
-            erase_not_touched(0);
-            update_db();
-        }
-    }
+    ~db_cache();
     
     data_handle operator [] (const std::string &key)
     {

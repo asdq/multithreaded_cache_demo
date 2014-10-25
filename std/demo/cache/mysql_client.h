@@ -25,6 +25,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#include <cassert>
 #include <mutex>
 #include <thread>
 #include <tuple>
@@ -36,7 +37,7 @@ namespace sql {
 }
 
 /*!
-    \brief Fetch from, and store to, table 'records' in 'temp' schema.
+    \brief Fetch from, and store to mysql table.
     
     Table format is:
     
@@ -44,10 +45,18 @@ namespace sql {
           `key` varchar(20) NOT NULL,
           `data` text,
          PRIMARY KEY (`key`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        )
     
-    Keeps a connection opened for each thread.
-    If 'key' is not in 'records', insert a new entry with empty 'data'.
+    If key is not in table, insert a new entry with empty data.
+    
+    This class handles a single connection for each thread. Since mysql
+    requires to call mysql_thread_end() before thread ends, you must
+    call the following methods within the thread:
+    
+    - thread_init() to start the work
+    - thread_end() at the end of the work
+    
+    this is true for the main thread too.
     
     \author Fabio Vaccari fabio.vaccari@gmail.com
 */
@@ -75,6 +84,7 @@ public:
     mysql_client() : mc_driver(nullptr) {}
     mysql_client(const std::string &url, const std::string usr,
         const std::string &pwd);
+    ~mysql_client() { assert(mc_conn_list.empty()); }
 
     std::string fetch(const std::string &key);
     void store(const std::string &key, const std::string &data);

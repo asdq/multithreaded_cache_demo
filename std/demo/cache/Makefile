@@ -16,7 +16,7 @@ threadcheck: test
 	valgrind --tool=helgrind ./test
 	
 memcheck: test
-	valgrind ./test
+	valgrind  --leak-check=full ./test
 
 profile:
 	$(CXX) $(CPPFLAGS) $(LDFLAGS) -pg db_cache.cpp mysql_client.cpp test.cpp
