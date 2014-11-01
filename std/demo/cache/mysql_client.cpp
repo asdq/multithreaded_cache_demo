@@ -140,6 +140,7 @@ sql::Connection* mysql_client::get_connection()
     
     if (get<1>(*i) != nullptr && get<1>(*i) -> isClosed()) {
     	delete get<1>(*i);
+    	get<1>(*i) = nullptr;
     }
     	
     if (get<1>(*i) == nullptr)
