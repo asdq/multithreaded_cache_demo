@@ -36,18 +36,71 @@ THE SOFTWARE.
 namespace futil {
 
 /*!
+    \brief Build a Direct Aciclic Graph.
+    
+    - O node.
+    - J neighbor iterator, J -> O
+    - T scalar type: -1, 0, 1, 2, 3, ...
+    
+    - N neighbors function: std::pair<J, J> neighbors(O)
+    accepts a node and returns an iterator from the first neighbor
+    to one past last neighbor.
+    
+    - L label function: T& label(O)
+    given two nodes returns a reference to the label
+    of the associated node.
+    
+    - F fill function: void fill_graph(T)
+    fill the labels of all nodes with the given value.
+    
+    Given an undirected graph and a root node, label nodes with the
+    distance from the root, where the distance is the number of hops.
+*/
+template <typename O, typename T, typename N, typename L, typename F>
+inline
+void make_dag(O root, N neighbors, L label, F fill_graph)
+{
+    fill_graph(-1);
+    
+    std::queue<O> queue;
+    std::queue<O> next;
+    T count = 0;
+    
+    queue.push(root);
+    label(root) = count;
+    ++count;
+    
+    do {
+        auto range = neighbors(queue.front());
+        
+        for (auto j = range.first; j != range.second; ++j) {
+            if (label(*j) < 0) {
+                label(*j) = count;
+                next.push(*j);
+            }
+        }
+        
+        queue.pop();
+        if (queue.empty()) {
+            std::swap(queue, next);
+            ++count;
+        }
+    } while( ! queue.empty());
+}
+
+/*!
     \brief Calculate the betweenness.
     
     Performs the Girvan-Newman algorithm.
     
     - O node.
     - I node iterator, I -> O
-    - J neighbour iterator, J -> O
-    - T scalar type.
+    - J neighbor iterator, J -> O
+    - T scalar type
     
-    - N neighbours function: std::pair<J, J> neighbours(O)
-    accepts a node and returns an iterator from the first neighbour
-    to one past last neighbour.
+    - N neighbors function: std::pair<J, J> neighbors(O)
+    accepts a node and returns an iterator from the first neighbor
+    to one past last neighbor.
     
     - W weight function: T& weight(O, O)
     given two nodes returns a reference to the weight
@@ -60,7 +113,7 @@ namespace futil {
 */
 template <typename O, typename T, typename I, typename N, typename W>
 inline
-void betweenness(I node_begin, I node_end, N neighbours, W weight)
+void betweenness(I node_begin, I node_end, N neighbors, W weight)
 {
     struct btw
     {
@@ -68,59 +121,28 @@ void betweenness(I node_begin, I node_end, N neighbours, W weight)
         std::vector<T> btw_paths;
         std::vector<int> btw_level;
         
-        void make_dag(O root, N neighbours)
-        {
-            std::queue<O> queue;
-            std::queue<O> next;
-            int m = btw_map[root];
-            int count = 0;
-            
-            queue.push(root);
-            btw_paths[m] = 0;
-            btw_level[m] = count;
-            ++count;
-            do {
-                auto range = neighbours(queue.front());
-                
-                for (auto j = range.first; j != range.second; ++j) {
-                    m = btw_map[*j];
-                    if (btw_level[m] < 0) {
-                        btw_level[m] = count;
-                        btw_paths[m] = 0;
-                        next.push(*j);
-                    }
-                }
-                
-                queue.pop();
-                if (queue.empty()) {
-                    std::swap(queue, next);
-                    ++count;
-                }
-            } while( ! queue.empty());
-        }
-        
-        void count_paths(O o, int l, N neighbours)
+        void count_paths(O o, int l, N neighbors)
         {
             int m = btw_map[o];
-            auto range = neighbours(o);
+            auto range = neighbors(o);
             
             btw_paths[m] += 1;
             for (auto j = range.first; j != range.second; ++j) {
                 if (btw_level[btw_map[*j]] > l) {
-                    count_paths(*j, l + 1, neighbours);
+                    count_paths(*j, l + 1, neighbors);
                 }
             }
         }
         
-        T summarize(O o, int l, N neighbours, W weight)
+        T summarize(O o, int l, N neighbors, W weight)
         {
             int m = btw_map[o];
             T sum = 1 / btw_paths[m];
-            auto range = neighbours(o);
+            auto range = neighbors(o);
             
             for (auto j = range.first; j != range.second; ++j) {
                 if (btw_level[btw_map[*j]] == l + 1) {
-                    T bw = summarize(*j, l + 1, neighbours, weight);
+                    T bw = summarize(*j, l + 1, neighbors, weight);
                     
                     weight(o, *j) += bw / 2;
                     sum += bw;
@@ -129,25 +151,34 @@ void betweenness(I node_begin, I node_end, N neighbours, W weight)
             return sum;
         }
         
-        btw(I node_begin, I node_end, N neighbours, W weight)
+        btw(I node_begin, I node_end, N neighbors, W weight)
         {
             int num_nodes = 0;
             for (auto i = node_begin; i != node_end; ++i) {
                 btw_map[*i] = num_nodes++;
             }
-            btw_paths = std::vector<T>(num_nodes);
-            btw_level = std::vector<int>(num_nodes);
+            btw_paths.resize(num_nodes);
+            btw_level.resize(num_nodes);
                       
             for (auto i = node_begin; i != node_end; ++i) {
                 std::fill(btw_paths.begin(), btw_paths.end(), 0);
-                std::fill(btw_level.begin(), btw_level.end(), -1);
-                make_dag(*i, neighbours);
-                count_paths(*i, 0, neighbours);
-                summarize(*i, 0, neighbours, weight);
+                
+                futil::make_dag<O, int>(*i, neighbors,
+                    
+                    [this] (O o) -> int& {
+                        return btw_level[btw_map[o]];
+                    },
+                    
+                    [this] (T t) {
+                        std::fill(btw_level.begin(), btw_level.end(), t);
+                    });
+                    
+                count_paths(*i, 0, neighbors);
+                summarize(*i, 0, neighbors, weight);
             }
         }
         
-    } instance(node_begin, node_end, neighbours, weight);
+    } instance(node_begin, node_end, neighbors, weight);
 }
 
 } // end futil
