@@ -10,7 +10,7 @@ static
 void test_raw_graph()
 {
     typedef tuple<char, char, float> edge_t;
-
+    
     vector<char> nodes = { 'A', 'B', 'C', 'D', 'E', 'F', 'G' };
     unordered_map<char, vector<char>> neighbor_map;
     vector<edge_t> edges;
@@ -48,7 +48,8 @@ void test_raw_graph()
     cout << endl;
     
     futil::betweenness<char, float>(nodes.begin(), nodes.end(),
-    
+        
+        // neighbors
         [&neighbor_map] (char n) {
             auto i = neighbor_map.find(n);
             
@@ -58,6 +59,7 @@ void test_raw_graph()
             throw range_error("Node not found.");
         },
         
+        // weight
         [&edges] (char a, char b) -> float& {
             for (auto &e : edges) {
                 if ((a == get<0>(e) && b == get<1>(e)) ||

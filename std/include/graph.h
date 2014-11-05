@@ -25,10 +25,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-// DEBUG
-#include <iostream>
-
 #include <algorithm>
+#include <functional>
 #include <queue>
 #include <unordered_map>
 #include <vector>
@@ -55,27 +53,33 @@ namespace futil {
     
     Given an undirected graph and a root node, label nodes with the
     distance from the root, where the distance is the number of hops.
+    
+    \param root starting node.
+    \param neighbors neighbor function.
+    \param label label function.
+    \param fill_graph function to fill the graph.
+    \return the depth reached.
 */
 template <typename O, typename T, typename N, typename L, typename F>
 inline
-void make_dag(O root, N neighbors, L label, F fill_graph)
+T make_dag(O root, N neighbors, L label, F fill_graph)
 {
     fill_graph(-1);
     
     std::queue<O> queue;
     std::queue<O> next;
-    T count = 0;
+    T depth = 0;
     
     queue.push(root);
-    label(root) = count;
-    ++count;
+    label(root) = depth;
+    ++depth;
     
     do {
         auto range = neighbors(queue.front());
         
         for (auto j = range.first; j != range.second; ++j) {
             if (label(*j) < 0) {
-                label(*j) = count;
+                label(*j) = depth;
                 next.push(*j);
             }
         }
@@ -83,9 +87,11 @@ void make_dag(O root, N neighbors, L label, F fill_graph)
         queue.pop();
         if (queue.empty()) {
             std::swap(queue, next);
-            ++count;
+            ++depth;
         }
     } while( ! queue.empty());
+    
+    return depth;
 }
 
 /*!
@@ -106,79 +112,86 @@ void make_dag(O root, N neighbors, L label, F fill_graph)
     given two nodes returns a reference to the weight
     of the associated edge.
     
-    Given a undirected graph, set the weight of the edges to the betweennes,
+    Given a undirected graph, set the weight of the edges to the betweennes
     i.e. the number of shortest paths upon edges of weight 1. If two nodes
     have more than one shortest path, the weight is a fraction according to
     ne number of paths.
+    
+    \param node_begin first node of the graph.
+    \param node_end one past last node of the graph.
+    \param neighbors neighbor function.
+    \param weight weight function.
 */
 template <typename O, typename T, typename I, typename N, typename W>
 inline
 void betweenness(I node_begin, I node_end, N neighbors, W weight)
 {
-    struct btw
-    {
-        std::unordered_map<O, int> btw_map;
-        std::vector<T> btw_paths;
-        std::vector<int> btw_level;
+    int num_nodes = 0;
+    std::unordered_map<O, int> node_map(num_nodes);
+    
+    for (auto i = node_begin; i != node_end; ++i) {
+        node_map[*i] = num_nodes++;
+    }
+              
+    std::vector<T> paths(num_nodes);
+    std::vector<int> graph_depth(num_nodes);
+    std::vector<std::tuple<O, int>> stack;
+    
+    for (auto i = node_begin; i != node_end; ++i) {
+        std::fill(paths.begin(), paths.end(), 0);
         
-        void count_paths(O o, int l, N neighbors)
-        {
-            int m = btw_map[o];
-            auto range = neighbors(o);
+        // make a direct aciclic graph:
+        // calculate the depth of the graph
+        // starting form a root node
+        futil::make_dag<O, int>(*i, neighbors,
             
-            btw_paths[m] += 1;
+            // label
+            [&] (O o) -> int& {
+                return graph_depth[node_map[o]];
+            },
+            
+            // fill_graph
+            [&] (T t) {
+                std::fill(graph_depth.begin(), graph_depth.end(), t);
+            });
+        
+        // count the number of the paths that reach each node
+        // starting from the root
+        stack.emplace_back(*i, 0);
+        do {
+            auto node = std::get<0>(stack.back());
+            auto depth = std::get<1>(stack.back());
+            stack.pop_back();
+            
+            auto m = node_map[node];
+            auto range = neighbors(node);
+            paths[m] += 1;
             for (auto j = range.first; j != range.second; ++j) {
-                if (btw_level[btw_map[*j]] > l) {
-                    count_paths(*j, l + 1, neighbors);
+                if (graph_depth[node_map[*j]] > depth) {
+                    stack.emplace_back(*j, depth + 1);
                 }
             }
-        }
+        } while ( ! stack.empty());
         
-        T summarize(O o, int l, N neighbors, W weight)
-        {
-            int m = btw_map[o];
-            T sum = 1 / btw_paths[m];
+        // calculate the betweennes from the root node
+        std::function<T(O, int)> summarize = [&] (O o, int l) {
+            int m = node_map[o];
+            T sum = 1 / paths[m];
             auto range = neighbors(o);
             
             for (auto j = range.first; j != range.second; ++j) {
-                if (btw_level[btw_map[*j]] == l + 1) {
-                    T bw = summarize(*j, l + 1, neighbors, weight);
+                if (graph_depth[node_map[*j]] == l + 1) {
+                    T bw = summarize(*j, l + 1);
                     
                     weight(o, *j) += bw / 2;
                     sum += bw;
                 }
             }
             return sum;
-        }
+        };
         
-        btw(I node_begin, I node_end, N neighbors, W weight)
-        {
-            int num_nodes = 0;
-            for (auto i = node_begin; i != node_end; ++i) {
-                btw_map[*i] = num_nodes++;
-            }
-            btw_paths.resize(num_nodes);
-            btw_level.resize(num_nodes);
-                      
-            for (auto i = node_begin; i != node_end; ++i) {
-                std::fill(btw_paths.begin(), btw_paths.end(), 0);
-                
-                futil::make_dag<O, int>(*i, neighbors,
-                    
-                    [this] (O o) -> int& {
-                        return btw_level[btw_map[o]];
-                    },
-                    
-                    [this] (T t) {
-                        std::fill(btw_level.begin(), btw_level.end(), t);
-                    });
-                    
-                count_paths(*i, 0, neighbors);
-                summarize(*i, 0, neighbors, weight);
-            }
-        }
-        
-    } instance(node_begin, node_end, neighbors, weight);
+        summarize(*i, 0);
+    }
 }
 
 } // end futil
