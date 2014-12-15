@@ -29,7 +29,7 @@ using namespace std;
 
 int main()
 {
-    futil::peterson spin;
+    futil::spin2 spin;
     
     cout << "Test the algorithm of Peterson." << endl;
     

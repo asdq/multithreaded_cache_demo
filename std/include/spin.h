@@ -41,7 +41,7 @@ namespace futil {
     Which process will start first is unpredictable.
     This class is BasicLockable.
  */
-class peterson
+class spin2
 {
     std::atomic<std::thread::id> p_threads[2];
     std::atomic<short> p_turn;
@@ -49,7 +49,7 @@ class peterson
     
 public:
     
-    peterson()
+    spin2()
     {
         p_flag[0].store(false);
         p_flag[1].store(false);
