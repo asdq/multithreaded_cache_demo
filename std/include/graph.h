@@ -27,7 +27,6 @@ THE SOFTWARE.
 
 #include <algorithm>
 #include <functional>
-#include <queue>
 #include <unordered_map>
 #include <vector>
 
@@ -66,30 +65,29 @@ T make_dag(O root, N neighbors, L label, F fill_graph)
 {
     fill_graph(-1);
     
-    std::queue<O> queue;
-    std::queue<O> next;
+    std::vector<O> st1, st2;
     T depth = 0;
     
-    queue.push(root);
+    st1.push_back(root);
     label(root) = depth;
     ++depth;
     
     do {
-        auto range = neighbors(queue.front());
+        auto range = neighbors(st1.back());
         
         for (auto j = range.first; j != range.second; ++j) {
             if (label(*j) < 0) {
                 label(*j) = depth;
-                next.push(*j);
+                st2.push_back(*j);
             }
         }
         
-        queue.pop();
-        if (queue.empty()) {
-            std::swap(queue, next);
+        st1.pop_back();
+        if (st1.empty()) {
+            std::swap(st1, st2);
             ++depth;
         }
-    } while( ! queue.empty());
+    } while( ! st1.empty());
     
     return depth;
 }
