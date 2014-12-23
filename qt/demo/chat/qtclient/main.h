@@ -27,10 +27,10 @@ public:
      * \brief States of client.
      */
     enum ClientState {
-    	Idle, //!< Dead state.
-    	Disconnected, //!< Client is disconnected.
-    	Connected, //!< Client is connected with a server, but is not logged.
-    	Logged //!< Client is connected with a server and entered the chat.
+        Idle, //!< Dead state.
+        Disconnected, //!< Client is disconnected.
+        Connected, //!< Client is connected with a server, but is not logged.
+        Logged //!< Client is connected with a server and entered the chat.
     };
     
     /*!
@@ -128,17 +128,17 @@ private:
     ClientState m_state;
     
     void setState(ClientState s) {
-    	if (m_state == s) return;
-    	
-    	m_state = s;
-    	emit stateChanged(s);
+        if (m_state == s) return;
+        
+        m_state = s;
+        emit stateChanged(s);
     }
     
     void setNickname(const QString &name) {
-    	if (m_nickname == name) return;
-    	
-    	m_nickname = name;
-    	emit nicknameChanged(name);
+        if (m_nickname == name) return;
+        
+        m_nickname = name;
+        emit nicknameChanged(name);
     }
     
     void dispatch(const QByteArray &packet);

@@ -24,78 +24,78 @@
  * Data serialization is performed as follows:
  *
  *    - an header, consisting of
- *    	- mask \ref mask()
- *    	- version \ref version()
+ *        - mask \ref mask()
+ *        - version \ref version()
  *    - a body
- *    	- message type \ref MessageType
- *    	- data according to the message type
+ *        - message type \ref MessageType
+ *        - data according to the message type
  *
  * details of the protocol:
  *
  *    - an empty message
- *    	-# mask \ref mask()
- *    	-# version \ref version()
- *    	-# \ref EmptyMessage
+ *        -# mask \ref mask()
+ *        -# version \ref version()
+ *        -# \ref EmptyMessage
  *
  *    - login procedure: the client and the server have a working connection,
  *      the client is not logged, the user takes a nickname
- *    	- client sends login request
- *    		-# mask \ref mask()
- *    		-# version \ref version()
- *    		-# \ref LoginRequest
- *    		-# nickname
- *    	- server checks the nickname
- *    		- if no connected client is using the nickname
- *    			- server sends the nickname back to the client
- *    				-# mask \ref mask()
- *    				-# version \ref version()
- *    				-# \ref LoginResponse
- *    				-# the nickname
- *    			- server informs the client of the other connected clients
- *    				-# mask \ref mask()
- *    				-# version \ref version()
- *    				-# \ref ClientEntered
- *    				-# the nicknames of all connected clients
- *    			- server informs all connected clients of the new client
- *    				-# mask \ref mask()
- *    				-# version \ref version()
- *    				-# \ref ClientEntered
- *    				4. the nickname of the client
- *    			- the client is logged
- *    		- if a connected client holds the nickname, server sends
- *    		  no nickname
- *    			- server sends \ref LoginResponse to the client
- *    				-# mask \ref mask()
- *    				-# version \ref version()
- *    				-# \ref LoginResponse
- *    				-# empty string
- *    			- the client informs the user
+ *        - client sends login request
+ *            -# mask \ref mask()
+ *            -# version \ref version()
+ *            -# \ref LoginRequest
+ *            -# nickname
+ *        - server checks the nickname
+ *            - if no connected client is using the nickname
+ *                - server sends the nickname back to the client
+ *                    -# mask \ref mask()
+ *                    -# version \ref version()
+ *                    -# \ref LoginResponse
+ *                    -# the nickname
+ *                - server informs the client of the other connected clients
+ *                    -# mask \ref mask()
+ *                    -# version \ref version()
+ *                    -# \ref ClientEntered
+ *                    -# the nicknames of all connected clients
+ *                - server informs all connected clients of the new client
+ *                    -# mask \ref mask()
+ *                    -# version \ref version()
+ *                    -# \ref ClientEntered
+ *                    4. the nickname of the client
+ *                - the client is logged
+ *            - if a connected client holds the nickname, server sends
+ *              no nickname
+ *                - server sends \ref LoginResponse to the client
+ *                    -# mask \ref mask()
+ *                    -# version \ref version()
+ *                    -# \ref LoginResponse
+ *                    -# empty string
+ *                - the client informs the user
  *
  *    - when a client disconnects, if it was logged, server informs
  *      the other connected clients
- *    	-# mask \ref mask()
- *    	-# version \ref version()
- *    	-# \ref ClientExited
- *    	-# nickname of the client
+ *        -# mask \ref mask()
+ *        -# version \ref version()
+ *        -# \ref ClientExited
+ *        -# nickname of the client
  *
  *    - sending a message: the client is connected with the
  *      server, the client is logged, the user instructs the client to send
  *      a message
- *    	- client sends to server
- *    		-# mask \ref mask()
- *    		-# version \ref version()
- *    		-# \ref TextMessage
- *    		-# his nickname
- *    		-# a list of receivers
- *    		-# the text
- *    	- server attaches a timestamp and sends to all
- *    	  the receivers in the list which are connected:
- *    		-# mask \ref mask()
- *    		-# version \ref version()
- *    		-# \ref TextMessage
- *    		-# timestamp
- *    		-# sender's nickname
- *    		-# the text
+ *        - client sends to server
+ *            -# mask \ref mask()
+ *            -# version \ref version()
+ *            -# \ref TextMessage
+ *            -# his nickname
+ *            -# a list of receivers
+ *            -# the text
+ *        - server attaches a timestamp and sends to all
+ *          the receivers in the list which are connected:
+ *            -# mask \ref mask()
+ *            -# version \ref version()
+ *            -# \ref TextMessage
+ *            -# timestamp
+ *            -# sender's nickname
+ *            -# the text
  *      note. There is no check if the receiver actually gets the message.
  */
 struct Protocol {

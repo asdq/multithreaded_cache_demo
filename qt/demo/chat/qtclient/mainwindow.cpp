@@ -28,56 +28,56 @@ MainWindow::MainWindow(Main *m, QWidget *parent)
     connect(m, &Main::deletedClients, listModel, &ClientListModel::remove);
     
     connect(m, &Main::stateChanged, [this, listModel] (Main::ClientState s) {
-    	switch (s) {
-    	case Main::Idle:
-    		ui -> statusBar -> showMessage(tr("Idle"));
-    		ui -> nickEdit -> setEnabled(false);
-    		return;
-    		
-    	case Main::Disconnected:
-    		ui -> statusBar -> showMessage(tr("Disconnected"));
-    		ui -> nickEdit -> setEnabled(false);
-    		listModel -> clear();
-    		return;
-    		
-    	case Main::Connected:
-    		ui -> statusBar -> showMessage(tr("Connected"));
-    		ui -> nickEdit -> setEnabled(true);
-    		ui -> stackedWidget -> setCurrentWidget(ui -> loginPanel);
-    		return;
-    		
-    	case Main::Logged:
-    		ui -> statusBar -> showMessage(tr("Logged"));
-    		ui -> nickEdit -> setEnabled(false);
-    		ui -> stackedWidget -> setCurrentWidget(ui -> chatPanel);
-    		ui -> lineEdit -> setFocus();
-    		return;
-    		
-    	default: return;
-    	}
+        switch (s) {
+        case Main::Idle:
+            ui -> statusBar -> showMessage(tr("Idle"));
+            ui -> nickEdit -> setEnabled(false);
+            return;
+            
+        case Main::Disconnected:
+            ui -> statusBar -> showMessage(tr("Disconnected"));
+            ui -> nickEdit -> setEnabled(false);
+            listModel -> clear();
+            return;
+            
+        case Main::Connected:
+            ui -> statusBar -> showMessage(tr("Connected"));
+            ui -> nickEdit -> setEnabled(true);
+            ui -> stackedWidget -> setCurrentWidget(ui -> loginPanel);
+            return;
+            
+        case Main::Logged:
+            ui -> statusBar -> showMessage(tr("Logged"));
+            ui -> nickEdit -> setEnabled(false);
+            ui -> stackedWidget -> setCurrentWidget(ui -> chatPanel);
+            ui -> lineEdit -> setFocus();
+            return;
+            
+        default: return;
+        }
     });
     
     connect(m, &Main::errorMessage, [this, popup] (const QString &text){
-    	popup -> setText(text);
-    	popup -> setVisible(true);
+        popup -> setText(text);
+        popup -> setVisible(true);
     });
     
     connect(m, &Main::chatMessage, [this, listModel] (
             const QDateTime &timestamp, const QString &source,
             const QString &text) {
-    	if (listModel -> contains(source)) {
-    		ui -> chatText -> append(timestamp.toString("yyyy-MM-dd hh:mm") %
-    		                         " " % source % ": " % text);
-    	}
+        if (listModel -> contains(source)) {
+            ui -> chatText -> append(timestamp.toString("yyyy-MM-dd hh:mm") %
+                                     " " % source % ": " % text);
+        }
     });
     
     connect(ui -> nickEdit, &QLineEdit::returnPressed, [this] {
-    	emit nickname(ui -> nickEdit -> text());
+        emit nickname(ui -> nickEdit -> text());
     });
     
     connect(ui -> lineEdit, &QLineEdit::returnPressed, [this, listModel] {
-    	emit message(listModel -> data(), ui -> lineEdit -> text());
-    	ui -> lineEdit -> clear();
+        emit message(listModel -> data(), ui -> lineEdit -> text());
+        ui -> lineEdit -> clear();
     });
 }
 

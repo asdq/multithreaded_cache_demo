@@ -61,16 +61,16 @@ void ClientListModel::remove(const QVector<QString> &clients) {
     QVector<QString>::const_iterator ec = end(clients);
     
     auto equate = [&i, &ec] (const QString &c) -> bool {
-    	while (i != ec && *i < c) ++i;
-    	if (i == ec) return false;
-    	if (*i == c) return ++i, true;
-    	return false;
+        while (i != ec && *i < c) ++i;
+        if (i == ec) return false;
+        if (*i == c) return ++i, true;
+        return false;
     };
     
     beginResetModel();
     e = end(m_data);
     for (a = b = begin(m_data); b != e; ++b) {
-    	if ( ! equate(*b)) *a++ = *b;
+        if ( ! equate(*b)) *a++ = *b;
     }
     m_data.erase(a, b);
     endResetModel();

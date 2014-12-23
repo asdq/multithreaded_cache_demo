@@ -19,9 +19,9 @@ class Main : public QObject {
     Q_OBJECT
     
     struct SocketHandler {
-    	QAbstractSocket *socket;
-    	QByteArray buffer;
-    	QString nickname;
+        QAbstractSocket *socket;
+        QByteArray buffer;
+        QString nickname;
     };
     
 public:

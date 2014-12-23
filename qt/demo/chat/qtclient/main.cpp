@@ -14,28 +14,28 @@ Main::Main(QObject *parent) : QObject(parent),
     auto *buffer = new QByteArray;
     
     connect(m_socket, &QAbstractSocket::destroyed, [buffer] {
-    	qDebug() << "delete buffer";
-    	delete buffer;
+        qDebug() << "delete buffer";
+        delete buffer;
     });
     
     connect(m_socket, &QAbstractSocket::readyRead, [this, buffer] {
-    	qDebug() << "QAbstractSocket::readyRead";
-    	
-    	if (m_state == Idle) return;
-    	
-    	QByteArray newData = m_socket -> readAll();
-    	int a, b;
-    	
-    	a = 0;
-    	do {
-    		b = newData.indexOf(Protocol::terminator(), a);
-    		buffer -> append(newData.mid(a, b != -1 ? b - a : -1));
-    		if (b != -1) {
-    			dispatch(QByteArray::fromBase64(*buffer));
-    			buffer -> clear();
-    		}
-    		a = b  + 1;
-    	} while (b != -1);
+        qDebug() << "QAbstractSocket::readyRead";
+        
+        if (m_state == Idle) return;
+        
+        QByteArray newData = m_socket -> readAll();
+        int a, b;
+        
+        a = 0;
+        do {
+            b = newData.indexOf(Protocol::terminator(), a);
+            buffer -> append(newData.mid(a, b != -1 ? b - a : -1));
+            if (b != -1) {
+                dispatch(QByteArray::fromBase64(*buffer));
+                buffer -> clear();
+            }
+            a = b  + 1;
+        } while (b != -1);
     });
     
     // try to reconnect on connection lost
@@ -46,21 +46,21 @@ Main::Main(QObject *parent) : QObject(parent),
     connect(timer, &QTimer::timeout, this, &Main::start);
     
     connect(m_socket, &QAbstractSocket::stateChanged, [this, timer] {
-    	qDebug() << "QAbstractSocket::stateChanged" << m_socket -> state();
-    	if (m_state == Idle) return;
-    	
-    	switch (m_socket -> state()) {
-    	case QAbstractSocket::UnconnectedState:
-    		setState(Disconnected);
-    		if ( ! timer -> isActive()) timer -> start();
-    		return;
-    		
-    	case QAbstractSocket::ConnectedState:
-    		setState(Connected);
-    		return;
-    		
-    	default: return;
-    	}
+        qDebug() << "QAbstractSocket::stateChanged" << m_socket -> state();
+        if (m_state == Idle) return;
+        
+        switch (m_socket -> state()) {
+        case QAbstractSocket::UnconnectedState:
+            setState(Disconnected);
+            if ( ! timer -> isActive()) timer -> start();
+            return;
+            
+        case QAbstractSocket::ConnectedState:
+            setState(Connected);
+            return;
+            
+        default: return;
+        }
     });
 }
 
@@ -69,8 +69,8 @@ void Main::start() {
     if (m_state != Disconnected) return;
     
     if (m_socket -> state() == QAbstractSocket::UnconnectedState) {
-    	qDebug() << "m_socket -> connectToHost 127.0.0.1 on port 54321";
-    	m_socket -> connectToHost("127.0.0.1", 54321);
+        qDebug() << "m_socket -> connectToHost 127.0.0.1 on port 54321";
+        m_socket -> connectToHost("127.0.0.1", 54321);
     }
 }
 
@@ -96,13 +96,13 @@ void Main::dispatch(const QByteArray &packet) {
     // wrong protocol
     in >> version;
     if (version != Protocol::version()) {
-    	setState(Idle);
-    	
-    	emit errorMessage(tr("Wrong protocol version: client's version %1, "
-    	                     "server's version %2")
-    	                  .arg(Protocol::version(), version));
-    	
-    	return m_socket -> disconnectFromHost();
+        setState(Idle);
+        
+        emit errorMessage(tr("Wrong protocol version: client's version %1, "
+                             "server's version %2")
+                          .arg(Protocol::version(), version));
+        
+        return m_socket -> disconnectFromHost();
     }
     
     MessageType mt;
@@ -124,8 +124,8 @@ void Main::onLoginResponse(QDataStream &in) {
     
     in >> name;
     if ( ! name.isEmpty()) {
-    	setNickname(name);
-    	setState(Logged);
+        setNickname(name);
+        setState(Logged);
     } else emit errorMessage(tr("NickName %1 is already in use.").arg(name));
 }
 
