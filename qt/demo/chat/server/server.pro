@@ -4,8 +4,8 @@ TARGET = server
 TEMPLATE = app
 VERSION = 0.1
 HEADERS += \
-	chat_serial.h \
-	main.h
+    chat_serial.h \
+    main.h
 
 SOURCES += \
-	main.cpp
+    main.cpp

@@ -14,14 +14,14 @@ TEMPLATE = app
 VERSION = 0.1
 
 SOURCES += \
-	main.cpp \
-	mainwindow.cpp \
-	clientlistmodel.cpp
+    main.cpp \
+    mainwindow.cpp \
+    clientlistmodel.cpp
 
 HEADERS  += \
-	mainwindow.h \
-	chat_serial.h \
-	main.h \
-	clientlistmodel.h
+    mainwindow.h \
+    chat_serial.h \
+    main.h \
+    clientlistmodel.h
 
 FORMS += mainwindow.ui

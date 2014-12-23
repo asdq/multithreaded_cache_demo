@@ -23,103 +23,103 @@
  * \ref terminator() .
  * Data serialization is performed as follows:
  *
- *	- an header, consisting of
- *		- mask \ref mask()
- *		- version \ref version()
- *	- a body
- *		- message type \ref MessageType
- *		- data according to the message type
+ *    - an header, consisting of
+ *    	- mask \ref mask()
+ *    	- version \ref version()
+ *    - a body
+ *    	- message type \ref MessageType
+ *    	- data according to the message type
  *
  * details of the protocol:
  *
- *	- an empty message
- *		-# mask \ref mask()
- *		-# version \ref version()
- *		-# \ref EmptyMessage
+ *    - an empty message
+ *    	-# mask \ref mask()
+ *    	-# version \ref version()
+ *    	-# \ref EmptyMessage
  *
- *	- login procedure: the client and the server have a working connection,
- *	  the client is not logged, the user takes a nickname
- *		- client sends login request
- *			-# mask \ref mask()
- *			-# version \ref version()
- *			-# \ref LoginRequest
- *			-# nickname
- *		- server checks the nickname
- *			- if no connected client is using the nickname
- *				- server sends the nickname back to the client
- *					-# mask \ref mask()
- *					-# version \ref version()
- *					-# \ref LoginResponse
- *					-# the nickname
- *				- server informs the client of the other connected clients
- *					-# mask \ref mask()
- *					-# version \ref version()
- *					-# \ref ClientEntered
- *					-# the nicknames of all connected clients
- *				- server informs all connected clients of the new client
- *					-# mask \ref mask()
- *					-# version \ref version()
- *					-# \ref ClientEntered
- *					4. the nickname of the client
- *				- the client is logged
- *			- if a connected client holds the nickname, server sends
- *			  no nickname
- *				- server sends \ref LoginResponse to the client
- *					-# mask \ref mask()
- *					-# version \ref version()
- *					-# \ref LoginResponse
- *					-# empty string
- *				- the client informs the user
+ *    - login procedure: the client and the server have a working connection,
+ *      the client is not logged, the user takes a nickname
+ *    	- client sends login request
+ *    		-# mask \ref mask()
+ *    		-# version \ref version()
+ *    		-# \ref LoginRequest
+ *    		-# nickname
+ *    	- server checks the nickname
+ *    		- if no connected client is using the nickname
+ *    			- server sends the nickname back to the client
+ *    				-# mask \ref mask()
+ *    				-# version \ref version()
+ *    				-# \ref LoginResponse
+ *    				-# the nickname
+ *    			- server informs the client of the other connected clients
+ *    				-# mask \ref mask()
+ *    				-# version \ref version()
+ *    				-# \ref ClientEntered
+ *    				-# the nicknames of all connected clients
+ *    			- server informs all connected clients of the new client
+ *    				-# mask \ref mask()
+ *    				-# version \ref version()
+ *    				-# \ref ClientEntered
+ *    				4. the nickname of the client
+ *    			- the client is logged
+ *    		- if a connected client holds the nickname, server sends
+ *    		  no nickname
+ *    			- server sends \ref LoginResponse to the client
+ *    				-# mask \ref mask()
+ *    				-# version \ref version()
+ *    				-# \ref LoginResponse
+ *    				-# empty string
+ *    			- the client informs the user
  *
- *	- when a client disconnects, if it was logged, server informs
- *	  the other connected clients
- *		-# mask \ref mask()
- *		-# version \ref version()
- *		-# \ref ClientExited
- *		-# nickname of the client
+ *    - when a client disconnects, if it was logged, server informs
+ *      the other connected clients
+ *    	-# mask \ref mask()
+ *    	-# version \ref version()
+ *    	-# \ref ClientExited
+ *    	-# nickname of the client
  *
- *	- sending a message: the client is connected with the
- *	  server, the client is logged, the user instructs the client to send
- *	  a message
- *		- client sends to server
- *			-# mask \ref mask()
- *			-# version \ref version()
- *			-# \ref TextMessage
- *			-# his nickname
- *			-# a list of receivers
- *			-# the text
- *		- server attaches a timestamp and sends to all
- *		  the receivers in the list which are connected:
- *			-# mask \ref mask()
- *			-# version \ref version()
- *			-# \ref TextMessage
- *			-# timestamp
- *			-# sender's nickname
- *			-# the text
- *	  note. There is no check if the receiver actually gets the message.
+ *    - sending a message: the client is connected with the
+ *      server, the client is logged, the user instructs the client to send
+ *      a message
+ *    	- client sends to server
+ *    		-# mask \ref mask()
+ *    		-# version \ref version()
+ *    		-# \ref TextMessage
+ *    		-# his nickname
+ *    		-# a list of receivers
+ *    		-# the text
+ *    	- server attaches a timestamp and sends to all
+ *    	  the receivers in the list which are connected:
+ *    		-# mask \ref mask()
+ *    		-# version \ref version()
+ *    		-# \ref TextMessage
+ *    		-# timestamp
+ *    		-# sender's nickname
+ *    		-# the text
+ *      note. There is no check if the receiver actually gets the message.
  */
 struct Protocol {
-	
-	/*!
-	 * \brief Protocol version.
-	 * \return current version.
-	 */
-	static
-	qint64 version() { return 20140823; }
-	
-	/*!
-	 * \brief Protocol mask.
-	 * \return message mask.
-	 */
-	static
-	qint64 mask() { return 65537; }
-	
-	/*!
-	 * \brief Protocol terminator.
-	 * \return terminator character.
-	 */
-	static
-	char terminator() { return '~'; }
+    
+    /*!
+     * \brief Protocol version.
+     * \return current version.
+     */
+    static
+    qint64 version() { return 20140823; }
+    
+    /*!
+     * \brief Protocol mask.
+     * \return message mask.
+     */
+    static
+    qint64 mask() { return 65537; }
+    
+    /*!
+     * \brief Protocol terminator.
+     * \return terminator character.
+     */
+    static
+    char terminator() { return '~'; }
 };
 
 /*!
@@ -133,8 +133,8 @@ struct Protocol {
  */
 inline
 QDataStream& setHeader(QDataStream &out) {
-	out.setVersion(QDataStream::Qt_5_2);
-	return out << Protocol::mask() << Protocol::version();
+    out.setVersion(QDataStream::Qt_5_2);
+    return out << Protocol::mask() << Protocol::version();
 }
 
 /*!
@@ -143,12 +143,12 @@ QDataStream& setHeader(QDataStream &out) {
  * List of implemented messages.
  */
 enum MessageType {
-	EmptyMessage, //!< as is.
-	LoginRequest, //!< client's login request.
-	LoginResponse, //!< server's response of a login request.
-	ClientEntered, //!< list of clients which entered the chat.
-	ClientExited, //!< list of clients which exited the chat.
-	TextMessage //!< one to many text message.
+    EmptyMessage, //!< as is.
+    LoginRequest, //!< client's login request.
+    LoginResponse, //!< server's response of a login request.
+    ClientEntered, //!< list of clients which entered the chat.
+    ClientExited, //!< list of clients which exited the chat.
+    TextMessage //!< one to many text message.
 };
 Q_DECLARE_TYPEINFO(MessageType, Q_PRIMITIVE_TYPE);
 Q_DECLARE_METATYPE(MessageType)
@@ -163,7 +163,7 @@ Q_DECLARE_METATYPE(MessageType)
  */
 inline
 QDataStream& operator << (QDataStream &out, const MessageType &mt) {
-	return out << static_cast<quint32>(mt);
+    return out << static_cast<quint32>(mt);
 }
 
 /*!
@@ -176,11 +176,11 @@ QDataStream& operator << (QDataStream &out, const MessageType &mt) {
  */
 inline
 QDataStream& operator >> (QDataStream &in, MessageType &mt) {
-	quint32 i;
-	
-	in >> i;
-	mt = static_cast<MessageType>(i);
-	return in;
+    quint32 i;
+    
+    in >> i;
+    mt = static_cast<MessageType>(i);
+    return in;
 }
 
 /*!
@@ -192,8 +192,8 @@ QDataStream& operator >> (QDataStream &in, MessageType &mt) {
  */
 inline
 void registerSerialMetatypes() {
-	qRegisterMetaType<MessageType>();
-	qRegisterMetaTypeStreamOperators<MessageType>("MessageType");
+    qRegisterMetaType<MessageType>();
+    qRegisterMetaTypeStreamOperators<MessageType>("MessageType");
 }
 
 #endif // CHAT_SERIAL_H
