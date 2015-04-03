@@ -25,11 +25,9 @@ THE SOFTWARE.
 #include "db_cache.h"
 #include "mysql_client.h"
 
-using namespace std;
-
-handle* db_cache::locate(const string &key)
+handle* db_cache::locate(const std::string &key)
 {
-    unique_lock<mutex> lk(c_cache_guard);
+    std::unique_lock<std::mutex> lk(c_cache_guard);
     c_read_lock.wait(lk, [this] {
         return c_cache_write_req == 0;
     });
@@ -51,9 +49,9 @@ handle* db_cache::locate(const string &key)
     return h;
 }
 
-handle* db_cache::add(const string &key)
+handle* db_cache::add(const std::string &key)
 {
-    unique_lock<mutex> lk(c_cache_guard);
+    std::unique_lock<std::mutex> lk(c_cache_guard);
     ++c_cache_write_req;
     c_write_lock.wait(lk, [this] {
         return c_cache_reading == 0;
@@ -80,10 +78,10 @@ handle* db_cache::add(const string &key)
 
 void db_cache::update_db()
 {
-    vector<tuple<string, string>> list;
+    std::vector<std::tuple<std::string, std::string>> list;
     
     auto copy_cache = [this] {
-        unique_lock<mutex> lk(c_cache_guard);
+        std::unique_lock<std::mutex> lk(c_cache_guard);
         c_read_lock.wait(lk, [this] {
             return c_cache_write_req == 0;
         });
@@ -110,7 +108,7 @@ void db_cache::update_db()
 
 void db_cache::erase_not_touched(size_t size)
 {
-    unique_lock<mutex> lk(c_cache_guard);
+    std::unique_lock<std::mutex> lk(c_cache_guard);
     
     if (c_cache.size() < size) return;
     
@@ -122,7 +120,7 @@ void db_cache::erase_not_touched(size_t size)
     auto i = c_cache.begin();
     while (i != c_cache.end()) {
         if ( ! i -> second -> touched()) {
-        	delete get<1>(*i);
+        	delete std::get<1>(*i);
             i = c_cache.erase(i);
         } else ++i;
     }
@@ -133,7 +131,10 @@ void db_cache::erase_not_touched(size_t size)
 
 void db_cache::timer_loop(unsigned utime)
 {
-    using namespace std::chrono;
+    using std::chrono::milliseconds;
+    using std::chrono::system_clock;
+    using std::chrono::duration_cast;
+    
     milliseconds ms(utime);
     auto t0 = system_clock::now();
     

@@ -28,9 +28,7 @@ THE SOFTWARE.
 #include <cstdlib>
 #include <cassert>
 
-using namespace std;
-
-const unsigned n_threads = thread::hardware_concurrency() * 2;
+const unsigned n_threads = std::thread::hardware_concurrency() * 2;
 //    const unsigned n_threads = 1;
 const unsigned n_records = 1000;
 
@@ -40,22 +38,22 @@ const int timeout = 100; // try to lock data
 const int size = 1000; // start to erase unused data
 
 static
-string random_string(int len)
+std::string random_string(int len)
 {
-    string mask = "a bc def ghij klmno pqrstu vxyz";
+    std::string mask = "a bc def ghij klmno pqrstu vxyz";
     int mask_len = mask.length();
-    string s;
+    std::string s;
     
     for (int i = 0; i < len; ++i) {
-        s.push_back(mask[rand() % mask_len]);
+        s.push_back(mask[std::rand() % mask_len]);
     }
     return s;
 }
 
 static
-vector<mysql_client::record> random_table()
+std::vector<mysql_client::record> random_table()
 {
-    vector<mysql_client::record> list;
+    std::vector<mysql_client::record> list;
     
     for (unsigned i = 0; i < n_records; ++i) {
         auto s = random_string(5);
@@ -65,34 +63,35 @@ vector<mysql_client::record> random_table()
 }
 
 static
-vector<mysql_client::record> sequential_table()
+std::vector<mysql_client::record> sequential_table()
 {
-    vector<mysql_client::record> list;
+    std::vector<mysql_client::record> list;
     
     for (unsigned i = 0; i < n_records; ++i) {
-        list.emplace_back(to_string(i), random_string(64));
+        list.emplace_back(std::to_string(i), random_string(64));
     }
     return list;
 }
 
 static
-void print(const string &key, const string &data, const string &fetched)
+void print(const std::string &key, const std::string &data,
+           const std::string &fetched)
 {
-    static mutex print_guard;
-    lock_guard<mutex> lk(print_guard);
-    cerr
-        << "[" << this_thread::get_id() << "] "
+    static std::mutex print_guard;
+    std::lock_guard<std::mutex> lk(print_guard);
+    std::cerr
+        << "[" << std::this_thread::get_id() << "] "
         << "key: " << key << " "
         << "data: " << data << " "
         << "fetched: " << fetched
-        << endl;
+        << std::endl;
 }
 
 static
 void test_direct(mysql_client &client,
-    const vector<mysql_client::record> &list)
+    const std::vector<mysql_client::record> &list)
 {
-    vector<thread> vt;
+    std::vector<std::thread> vt;
     
     client.store(list);
     for (unsigned i = 0; i < n_threads; ++i) {
@@ -100,10 +99,10 @@ void test_direct(mysql_client &client,
             client.thread_init();
                 
             for (auto &t : list) {
-                auto fetched = client.fetch(get<0>(t));
+                auto fetched = client.fetch(std::get<0>(t));
                 
-//                print(get<0>(t), get<1>(t), fetched);
-                assert(fetched == get<1>(t));
+//                print(std::get<0>(t), std::get<1>(t), fetched);
+                assert(fetched == std::get<1>(t));
             }
             client.thread_end();
         });
@@ -113,24 +112,24 @@ void test_direct(mysql_client &client,
 
 static
 void test_cached(mysql_client &client,
-    const vector<mysql_client::record> &list)
+    const std::vector<mysql_client::record> &list)
 {
     db_cache cclient(&client, dt, timeout, size);
-    vector<thread> vt;
+    std::vector<std::thread> vt;
     
     for (unsigned i = 0; i < n_threads; ++i) {
         vt.emplace_back( [&client, &cclient, &list] {
             client.thread_init();
             
             for (auto &t : list) {
-                *cclient[get<0>(t)] = get<1>(t);
+                *cclient[std::get<0>(t)] = std::get<1>(t);
             }
             
             for (auto &t : list) {
-                auto h = cclient[get<0>(t)];
+                auto h = cclient[std::get<0>(t)];
                 
-//                print(get<0>(t), get<1>(t), *h);
-                assert(*h == get<1>(t));
+//                print(std::get<0>(t), std::get<1>(t), *h);
+                assert(*h == std::get<1>(t));
             }
 
             client.thread_end();
@@ -141,43 +140,47 @@ void test_cached(mysql_client &client,
 
 int main()
 {
-    mysql_client client("localhost", "fabio", "");
-    vector<mysql_client::record> list;
-    chrono::time_point<chrono::system_clock> t0, t1;
+    using std::chrono::milliseconds;
+    using std::chrono::system_clock;
+    using std::chrono::duration_cast;
     
-    srand(time(nullptr));
+    mysql_client client("localhost", "fabio", "");
+    std::vector<mysql_client::record> list;
+    std::chrono::time_point<std::chrono::system_clock> t0, t1;
+    
+    std::srand(std::time(nullptr));
 /*
     list = random_table();
-    cout 
+    std::cout 
         << "testing without cache" << '\n'
         << "threads: " << n_threads  << '\n'
         << "records: " << n_records << '\n'
-        << "..." << endl;
+        << "..." << std::endl;
         
-    t0 = chrono::system_clock::now();
+    t0 = system_clock::now();
     test_direct(client, list);
-    t1 = chrono::system_clock::now();
+    t1 = system_clock::now();
     
-    cout
+    std::cout
         << "elapsed time: "
-        << chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
-        << " milliseconds.\n" << endl;
+        << duration_cast<milliseconds>(t1 - t0).count()
+        << " milliseconds.\n" << std::endl;
 */    
     list = sequential_table();
-    cout 
+    std::cout 
         << "testing with cache" << '\n'
         << "threads: " << n_threads  << '\n'
         << "records: " << n_records << '\n'
-        << "..." << endl;
+        << "..." << std::endl;
         
-    t0 = chrono::system_clock::now();
+    t0 = system_clock::now();
     test_cached(client, list);
-    t1 = chrono::system_clock::now();
+    t1 = system_clock::now();
     
-    cout
+    std::cout
         << "elapsed time: "
-        << chrono::duration_cast<chrono::milliseconds>(t1 - t0).count()
-        << " milliseconds.\n" << endl;
+        << duration_cast<milliseconds>(t1 - t0).count()
+        << " milliseconds.\n" << std::endl;
     
     return 0;
 }

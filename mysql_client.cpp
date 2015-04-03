@@ -33,20 +33,18 @@ THE SOFTWARE.
 #include <mysql/mysql.h>
 #include <stdlib.h>
 
-using namespace std;
-
-mysql_client::mysql_client(const string &url, const string usr,
-    const string &pwd) : mc_host(url), mc_user(usr), mc_password(pwd)
+mysql_client::mysql_client(const std::string &url, const std::string usr,
+    const std::string &pwd) : mc_host(url), mc_user(usr), mc_password(pwd)
 {
     mc_driver = get_driver_instance();
 }
 
-string mysql_client::fetch(const string &key)
+std::string mysql_client::fetch(const std::string &key)
 {
     sql::Connection *conn = get_connection();
     sql::PreparedStatement *pstmt = nullptr;
     sql::ResultSet *res = nullptr;
-    string data;
+    std::string data;
     
     pstmt = conn -> prepareStatement(R"mysql(
         SELECT     `data`
@@ -67,7 +65,7 @@ string mysql_client::fetch(const string &key)
     return data;
 }
 
-void mysql_client::store(const vector<record> &list)
+void mysql_client::store(const std::vector<record> &list)
 {
     sql::Connection *conn = get_connection();
     sql::PreparedStatement *pstmt = nullptr;
@@ -81,9 +79,9 @@ void mysql_client::store(const vector<record> &list)
     )mysql");
     
     for (auto &t : list) {
-        pstmt -> setString(1, get<0>(t));
-        pstmt -> setString(2, get<1>(t));
-        pstmt -> setString(3, get<1>(t));
+        pstmt -> setString(1, std::get<0>(t));
+        pstmt -> setString(2, std::get<1>(t));
+        pstmt -> setString(3, std::get<1>(t));
         pstmt -> executeUpdate();
     }
     conn -> commit();
@@ -92,7 +90,7 @@ void mysql_client::store(const vector<record> &list)
     delete pstmt;
 }
 
-void mysql_client::store(const string &key, const string &data)
+void mysql_client::store(const std::string &key, const std::string &data)
 {
     sql::Connection *conn = get_connection();
     sql::PreparedStatement *pstmt = nullptr;
@@ -125,46 +123,44 @@ void mysql_client::thread_end()
 
 sql::Connection* mysql_client::get_connection()
 {
-    lock_guard<mutex> lk(mc_guard);
-    auto id = this_thread::get_id();
+    std::lock_guard<std::mutex> lk(mc_guard);
+    auto id = std::this_thread::get_id();
     auto i = find_if(mc_conn_list.begin(), mc_conn_list.end(),
         [id] (const conn_entry &t) {
-            return id == get<0>(t);
-        }
-    );
+            return id == std::get<0>(t);
+        });
     
     if (i == mc_conn_list.end()) {
         mc_conn_list.emplace_back(id, nullptr);
         i = --mc_conn_list.end();
     }
     
-    if (get<1>(*i) != nullptr && get<1>(*i) -> isClosed()) {
-    	delete get<1>(*i);
-    	get<1>(*i) = nullptr;
+    if (std::get<1>(*i) != nullptr && std::get<1>(*i) -> isClosed()) {
+    	delete std::get<1>(*i);
+    	std::get<1>(*i) = nullptr;
     }
     	
-    if (get<1>(*i) == nullptr)
-    {
-        get<1>(*i) = mc_driver -> connect(mc_host, mc_user, mc_password);
-        get<1>(*i) -> setSchema("test");
+    if (std::get<1>(*i) == nullptr) {
+        std::get<1>(*i) = mc_driver -> connect(mc_host, mc_user, mc_password);
+        std::get<1>(*i) -> setSchema("test");
     }
     
-    return get<1>(*i);
+    return std::get<1>(*i);
 }
 
 void mysql_client::close_connection()
 {
-    lock_guard<mutex> lk(mc_guard);
-    auto id = this_thread::get_id();
-    auto i = find_if(mc_conn_list.begin(), mc_conn_list.end(),
+    std::lock_guard<std::mutex> lk(mc_guard);
+    auto id = std::this_thread::get_id();
+    auto i = std::find_if(mc_conn_list.begin(), mc_conn_list.end(),
         [id] (const conn_entry &t) {
-            return id == get<0>(t);
+            return id == std::get<0>(t);
         }
     );
     
     if (i != mc_conn_list.end()) {
-        delete get<1>(*i);
-        swap(*i, mc_conn_list.back());
+        delete std::get<1>(*i);
+        std::swap(*i, mc_conn_list.back());
         mc_conn_list.pop_back();
     }
 }
