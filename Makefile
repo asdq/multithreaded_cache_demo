@@ -1,25 +1,24 @@
-CC = g++
-CXX = g++
-CFLAGS = -Wall -march=native -O2
-CPPFLAGS = -std=c++11 $(CFLAGS)
+CXX = g++ -std=c++11
+CXXFLAGS = -Wall -march=native -O2
 LDFLAGS = $(shell mysql_config --libs) -lmysqlcppconn 
 
-test: test.o db_cache.o mysql_client.o
-test.o : test.cpp db_cache.h mysql_client.h Makefile
-mysql_client.o : mysql_client.cpp mysql_client.h Makefile
-db_cache.o : db_cache.cpp db_cache.h Makefile
-
-clean:
-	rm -f test *.o
-
+all: database test
+	
+database: records.sql
+	mysql < $^
+	
+test: test.cpp db_cache.cpp mysql_client.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
+	
 threadcheck: test
 	valgrind --tool=helgrind ./test
 	
 memcheck: test
-	valgrind  --leak-check=full ./test
-
-profile:
-	$(CXX) $(CPPFLAGS) $(LDFLAGS) -pg db_cache.cpp mysql_client.cpp test.cpp
-	./a.out
-	gprof | cut -c 1-80
-	@rm -f a.out gmon.out
+	valgrind --leak-check=full ./test
+	
+profile: test
+	valgrind --tool=callgrind ./test
+	
+clean:
+	rm -f test callgrind.out.*
+	
