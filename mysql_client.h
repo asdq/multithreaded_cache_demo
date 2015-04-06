@@ -25,19 +25,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include <cassert>
-#include <mutex>
-#include <thread>
+#include <memory>
+#include <string>
 #include <tuple>
 #include <vector>
 
-namespace sql {
-    class Driver;
-    class Connection;
-}
-
 /*!
-    \brief Fetch from, and store to mysql table.
+    \brief Client for mysql table.
     
     Table format is:
     
@@ -53,39 +47,27 @@ namespace sql {
     requires to call mysql_thread_end() before thread ends, you must
     call the following methods within the thread:
     
-    - thread_init() to start the work
-    - thread_end() at the end of the work
+    - thread_init() to start table operations
+    - thread_end() at the end of table operations
     
     this is true for the main thread too.
-    
-    \author Fabio Vaccari fabio.vaccari@gmail.com
 */
 class mysql_client
 {
-    sql::Driver *mc_driver;
+    class mysql_connection_handler;
     
-    std::string mc_host;
-    std::string mc_user;
-    std::string mc_password;
-    
-    std::mutex mc_guard;
-    
-    typedef std::tuple<std::thread::id, sql::Connection*> conn_entry;
-    std::vector<conn_entry> mc_conn_list;
-    
-    sql::Connection* get_connection();
-    void close_connection();
+    std::unique_ptr<mysql_connection_handler> mc_conn_handler;
     
 public:
     
     // key, data
     typedef std::tuple<std::string, std::string> record;
-
-    mysql_client() : mc_driver(nullptr) {}
+    
     mysql_client(const std::string &url, const std::string usr,
         const std::string &pwd);
-    ~mysql_client() { assert(mc_conn_list.empty()); }
-
+        
+    ~mysql_client();
+    
     std::string fetch(const std::string &key);
     void store(const std::string &key, const std::string &data);
     void store(const std::vector<record> &list);

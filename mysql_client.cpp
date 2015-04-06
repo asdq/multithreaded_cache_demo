@@ -23,105 +23,53 @@ THE SOFTWARE.
 */
 
 #include "mysql_client.h"
-#include "mysql_connection.h"
 #include <algorithm>
+#include <cassert>
 #include <cppconn/driver.h>
-#include <cppconn/exception.h>
 #include <cppconn/prepared_statement.h>
-#include <cppconn/resultset.h>
-#include <cppconn/statement.h>
+#include <mutex>
 #include <mysql/mysql.h>
-#include <stdlib.h>
+#include <thread>
 
-mysql_client::mysql_client(const std::string &url, const std::string usr,
-    const std::string &pwd) : mc_host(url), mc_user(usr), mc_password(pwd)
+using statement = std::unique_ptr<sql::PreparedStatement>;
+using result_set = std::unique_ptr<sql::ResultSet>;
+
+class mysql_client::mysql_connection_handler
+{
+    std::string mc_host;
+    std::string mc_user;
+    std::string mc_password;
+    
+    // MySQL driver
+    sql::Driver *mc_driver;
+    
+    typedef std::tuple<std::thread::id, sql::Connection*> conn_entry;
+    std::vector<conn_entry> mc_conn_list;
+    std::mutex mc_guard;
+    
+public:
+    mysql_connection_handler(const std::string &url,
+        const std::string usr, const std::string &pwd);
+    
+    ~mysql_connection_handler();
+    
+    sql::Connection* get_connection();
+    void close_connection();
+};
+
+mysql_client::mysql_connection_handler::mysql_connection_handler(
+    const std::string &url, const std::string usr, const std::string &pwd
+    ) : mc_host(url), mc_user(usr), mc_password(pwd)
 {
     mc_driver = get_driver_instance();
 }
 
-std::string mysql_client::fetch(const std::string &key)
+mysql_client::mysql_connection_handler::~mysql_connection_handler()
 {
-    sql::Connection *conn = get_connection();
-    sql::PreparedStatement *pstmt = nullptr;
-    sql::ResultSet *res = nullptr;
-    std::string data;
-    
-    pstmt = conn -> prepareStatement(R"mysql(
-        SELECT     `data`
-        FROM `records`
-        WHERE `key` = ?
-    )mysql");
-    
-    pstmt -> setString(1, key);
-    res = pstmt -> executeQuery();
-    
-    if (res -> rowsCount() != 0) {
-        res -> next();
-        data = res -> getString(1);
-    }
-    
-    delete res;
-    delete pstmt;
-    return data;
+    assert(mc_conn_list.empty());
 }
 
-void mysql_client::store(const std::vector<record> &list)
-{
-    sql::Connection *conn = get_connection();
-    sql::PreparedStatement *pstmt = nullptr;
-    
-    conn -> setAutoCommit(false);
-    
-    pstmt = conn -> prepareStatement(R"mysql(
-        INSERT INTO `records`
-        SET  `key` = ?, `data` = ?
-        ON DUPLICATE KEY UPDATE `data` = ?
-    )mysql");
-    
-    for (auto &t : list) {
-        pstmt -> setString(1, std::get<0>(t));
-        pstmt -> setString(2, std::get<1>(t));
-        pstmt -> setString(3, std::get<1>(t));
-        pstmt -> executeUpdate();
-    }
-    conn -> commit();
-    
-    conn -> setAutoCommit(true);
-    delete pstmt;
-}
-
-void mysql_client::store(const std::string &key, const std::string &data)
-{
-    sql::Connection *conn = get_connection();
-    sql::PreparedStatement *pstmt = nullptr;
-    
-    pstmt = conn -> prepareStatement(R"mysql(
-        INSERT INTO `records`
-        SET  `key` = ?, `data` = ?
-        ON DUPLICATE KEY UPDATE `data` = ?
-    )mysql");
-    
-    pstmt -> setString(1, key);
-    pstmt -> setString(2, data);
-    pstmt -> setString(3, data);
-    pstmt -> executeUpdate();
-    
-    delete pstmt;
-}
-
-void mysql_client::thread_init()
-{
-    ::mysql_thread_init();
-    get_connection();
-}
-
-void mysql_client::thread_end()
-{
-    close_connection();
-    ::mysql_thread_end();
-}
-
-sql::Connection* mysql_client::get_connection()
+sql::Connection* mysql_client::mysql_connection_handler::get_connection()
 {
     std::lock_guard<std::mutex> lk(mc_guard);
     auto id = std::this_thread::get_id();
@@ -148,7 +96,7 @@ sql::Connection* mysql_client::get_connection()
     return std::get<1>(*i);
 }
 
-void mysql_client::close_connection()
+void mysql_client::mysql_connection_handler::close_connection()
 {
     std::lock_guard<std::mutex> lk(mc_guard);
     auto id = std::this_thread::get_id();
@@ -163,4 +111,86 @@ void mysql_client::close_connection()
         std::swap(*i, mc_conn_list.back());
         mc_conn_list.pop_back();
     }
+}
+
+mysql_client::mysql_client(const std::string &url, const std::string usr,
+    const std::string &pwd)
+    : mc_conn_handler(new mysql_connection_handler(url, usr, pwd))
+{}
+
+mysql_client::~mysql_client()
+{}
+
+std::string mysql_client::fetch(const std::string &key)
+{
+    sql::Connection *conn = mc_conn_handler -> get_connection();
+    std::string data;
+    
+    statement pstmt(conn -> prepareStatement(R"mysql(
+        SELECT     `data`
+        FROM `records`
+        WHERE `key` = ?
+    )mysql"));
+    
+    pstmt -> setString(1, key);
+    
+    result_set res(pstmt -> executeQuery());
+    
+    if (res -> rowsCount() != 0) {
+        res -> next();
+        data = res -> getString(1);
+    }
+    
+    return data;
+}
+
+void mysql_client::store(const std::vector<record> &list)
+{
+    sql::Connection *conn = mc_conn_handler -> get_connection();
+    
+    conn -> setAutoCommit(false);
+    
+    statement pstmt(conn -> prepareStatement(R"mysql(
+        INSERT INTO `records`
+        SET  `key` = ?, `data` = ?
+        ON DUPLICATE KEY UPDATE `data` = ?
+    )mysql"));
+    
+    for (auto &t : list) {
+        pstmt -> setString(1, std::get<0>(t));
+        pstmt -> setString(2, std::get<1>(t));
+        pstmt -> setString(3, std::get<1>(t));
+        pstmt -> executeUpdate();
+    }
+    conn -> commit();
+    
+    conn -> setAutoCommit(true);
+}
+
+void mysql_client::store(const std::string &key, const std::string &data)
+{
+    sql::Connection *conn = mc_conn_handler -> get_connection();
+    
+    statement pstmt(conn -> prepareStatement(R"mysql(
+        INSERT INTO `records`
+        SET  `key` = ?, `data` = ?
+        ON DUPLICATE KEY UPDATE `data` = ?
+    )mysql"));
+    
+    pstmt -> setString(1, key);
+    pstmt -> setString(2, data);
+    pstmt -> setString(3, data);
+    pstmt -> executeUpdate();
+}
+
+void mysql_client::thread_init()
+{
+    ::mysql_thread_init();
+    mc_conn_handler -> get_connection();
+}
+
+void mysql_client::thread_end()
+{
+    mc_conn_handler -> close_connection();
+    ::mysql_thread_end();
 }
