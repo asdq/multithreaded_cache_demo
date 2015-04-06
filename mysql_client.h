@@ -43,9 +43,10 @@ THE SOFTWARE.
     
     If key is not in table, insert a new entry with empty data.
     
-    This class handles a single connection for each thread. Since mysql
-    requires to call mysql_thread_end() before thread ends, you must
-    call the following methods within the thread:
+    This class handles a single connection for each thread.
+    Only one instance of this class is allowed in a process.
+    Since mysql requires to call mysql_thread_end() before thread ends,
+    you must call the following methods within the thread:
     
     - thread_init() to start table operations
     - thread_end() at the end of table operations

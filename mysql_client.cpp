@@ -31,6 +31,7 @@ THE SOFTWARE.
 #include <mysql/mysql.h>
 #include <thread>
 
+// note. shared pointers are handled by the driver
 using statement = std::unique_ptr<sql::PreparedStatement>;
 using result_set = std::unique_ptr<sql::ResultSet>;
 
@@ -87,7 +88,9 @@ sql::Connection* mysql_client::mysql_connection_handler::get_connection()
     	delete std::get<1>(*i);
     	std::get<1>(*i) = nullptr;
     }
-    	
+    
+    // it seems that creating a connection is not thread safe,
+    // so you must call it within a critical section
     if (std::get<1>(*i) == nullptr) {
         std::get<1>(*i) = mc_driver -> connect(mc_host, mc_user, mc_password);
         std::get<1>(*i) -> setSchema("test");

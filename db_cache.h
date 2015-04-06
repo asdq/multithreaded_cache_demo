@@ -1,5 +1,6 @@
 #ifndef DB_CACHE_H
 #define DB_CACHE_H
+
 /*
 The MIT License (MIT)
 
@@ -24,6 +25,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+// TODO better organize code
+
 #include <chrono>
 #include <condition_variable>
 #include <exception>
@@ -32,6 +35,17 @@ THE SOFTWARE.
 #include <thread>
 #include <vector>
 #include <unordered_map>
+
+struct db_cache_timeout : public std::runtime_error
+{
+    explicit
+    db_cache_timeout(const std::string& what_arg)
+    : std::runtime_error(what_arg) {}
+    
+    explicit
+    db_cache_timeout(const char* what_arg)
+    : std::runtime_error(what_arg) {}
+};
 
 class handle
 {
@@ -52,14 +66,14 @@ public:
     {
     //    It seems that try_lock_for is buggy
     //    if ( ! h_data_guard.try_lock_for(timeout)) {
-    //        throw std::runtime_error("Timeout: failed to lock the handle.");
+    //        throw std::db_cache_timeout("Timeout: failed to lock the handle.");
     //    }
         
     //    workaround
         auto now = std::chrono::system_clock::now();
         
         if ( ! h_data_guard.try_lock_until(now + timeout)) {
-            throw std::runtime_error("Timeout: failed to lock the handle.");
+            throw db_cache_timeout("Timeout: failed to lock the handle.");
         }
     }
     

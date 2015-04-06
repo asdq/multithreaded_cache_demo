@@ -76,6 +76,7 @@ handle* db_cache::add(const std::string &key)
     return h;
 }
 
+// used within the timer loop and in the destructor
 void db_cache::update_db()
 {
     std::vector<std::tuple<std::string, std::string>> list;
@@ -97,15 +98,20 @@ void db_cache::update_db()
     };
     
     for (auto &t : copy_cache()) {
-        t.second -> lock(c_handle_timeout);
-        if (t.second -> set_touched(false)) {
-            list.emplace_back(t.first, t.second -> data);
-        }
-        t.second -> unlock();
+        for (;;) try {
+            t.second -> lock(c_handle_timeout);
+            if (t.second -> set_touched(false)) {
+                list.emplace_back(t.first, t.second -> data);
+            }
+            t.second -> unlock();
+            break;
+            
+        } catch (db_cache_timeout) {}
     }
     c_client -> store(list);
 }
 
+// used within the timer loop and in the destructor
 void db_cache::erase_not_touched(size_t size)
 {
     std::unique_lock<std::mutex> lk(c_cache_guard);
@@ -129,6 +135,7 @@ void db_cache::erase_not_touched(size_t size)
     if (c_cache_write_req == 0) c_read_lock.notify_all();
 }
 
+// the timer runs in a dedicated thread
 void db_cache::timer_loop(unsigned utime)
 {
     using std::chrono::milliseconds;
@@ -149,12 +156,15 @@ void db_cache::timer_loop(unsigned utime)
     } while ( ! get_exit());
     c_client -> thread_end();
 }
-    
+
+// runs in the main thread, after all threads are closed
 db_cache::~db_cache()
 {
+    // wait for the timer to end
     set_exit(true);
     c_timer.join();
     
+    // store remaining data
     c_client -> thread_init();
     while( ! c_cache.empty()) {
         erase_not_touched(0);
