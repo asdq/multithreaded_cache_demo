@@ -78,8 +78,8 @@ std::vector<mysql_client::record> random_table()
 }
 
 // start different threads
-// each of them fetch a list of records and compare the values
-// if values don't correspond, store the value on the list
+// each of them fetches a list of records and compares values
+// if the values don't correspond, store the value on the list
 static
 void test_cached(mysql_client &client)
 {
@@ -101,20 +101,24 @@ void test_cached(mysql_client &client)
                     break;
                     
                 } catch(db_cache_timeout e) {
-                	std::lock_guard<std::mutex> lk(print_guard);
+                	std::unique_lock<std::mutex> lk(print_guard);
                 	std::cerr << "thread " << std::this_thread::get_id()
                 	          << " timeout on key '" << std::get<0>(t)
                 	          << "'\n";
+                	lk.unlock();
+                	
                 	std::this_thread::yield();
                 }
             }
             auto t1 = system_clock::now();
             
-            std::lock_guard<std::mutex> lk(print_guard);
+            std::unique_lock<std::mutex> lk(print_guard);
             std::cerr << "thread " << std::this_thread::get_id()
                       << " elapsed time: "
                       << duration_cast<milliseconds>(t1 - t0).count()
                       << " milliseconds.\n";
+            lk.unlock();
+            
             client.thread_end();
         });
     }
